@@ -41,7 +41,7 @@ export function useDoc(busy) {
     const poll = setInterval(() => !document.hidden && reload(), 15000);
     const tick = setInterval(() => setTick((x) => x + 1), 60000);
     const onFocus = () => reload();
-    const onChanged = () => reload(true);
+    const onChanged = () => reload();
     addEventListener("focus", onFocus);
     addEventListener("todo-changed", onChanged);
     return () => { clearInterval(poll); clearInterval(tick); removeEventListener("focus", onFocus); removeEventListener("todo-changed", onChanged); };

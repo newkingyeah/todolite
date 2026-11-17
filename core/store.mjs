@@ -31,6 +31,9 @@ const MIGRATIONS = [`
   CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL); -- value: JSON
   CREATE INDEX cards_by_section ON cards (section_id);
   CREATE INDEX items_by_card ON items (card_id);
+`, `
+  ALTER TABLE items ADD COLUMN agent_name TEXT;
+  ALTER TABLE items ADD COLUMN agent_result TEXT;
 `];
 
 // ---- The document and its rows ----
@@ -58,6 +61,7 @@ function rowsOf(doc) {
       created_at: i.createdAt, updated_at: i.updatedAt, done_at: i.doneAt, due: i.due, reason: i.reason, waiting_on: i.waitingOn,
       repeat_days: json(i.repeat?.days), repeat_time: i.repeat?.time,
       agent_where: i.agent?.where, agent_note: i.agent?.note, agent_since: i.agent?.since, agent_last_seen: i.agent?.lastSeen,
+      agent_name: i.agent?.name, agent_result: i.agent?.result,
       source: json(i.source),
     })),
     check_ins: doc.items.flatMap((i) => (i.doneDates ?? []).map((day) => ({ item_id: i.id, day }))),
@@ -76,7 +80,8 @@ function docOf(rows) {
     sections: rows.sections.map((r) => present({ id: r.id, title: r.title, sub: r.sub, note: r.note, hidden: flag(r.hidden), order: r.position })),
     groups: rows.cards.map((r) => present({ id: r.id, section: r.section_id, title: r.title, note: r.note, plain: flag(r.plain), order: r.position })),
     items: rows.items.map((r) => {
-      const agent = present({ where: r.agent_where, note: r.agent_note, since: r.agent_since, lastSeen: r.agent_last_seen });
+      const agent = present({ where: r.agent_where, note: r.agent_note, since: r.agent_since, lastSeen: r.agent_last_seen,
+        name: r.agent_name, result: r.agent_result });
       return present({
         id: r.id, group: r.card_id, title: r.title, status: r.status, note: r.note, order: r.position,
         createdAt: r.created_at, updatedAt: r.updated_at, doneAt: r.done_at, due: r.due, reason: r.reason, waitingOn: r.waiting_on,

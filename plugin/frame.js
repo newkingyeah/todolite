@@ -18,7 +18,7 @@ const connect = event => {
     if (data?.todoChanged) window.dispatchEvent(new Event('todo-changed'));
     if (data?.todoHostTheme) {
       window.TODO_PLUGIN.hostMode = data.todoHostTheme;
-      window.dispatchEvent(new Event('todo-changed'));
+      window.dispatchEvent(new Event('todo-host-theme'));
     }
     if (!data?.todoResponse) return;
     const request = pending.get(data.id);

@@ -1,4 +1,4 @@
-import { Plugin, ItemView } from 'obsidian';
+import { FileSystemAdapter, Platform, Plugin, ItemView } from 'obsidian';
 import { TodoSettingsTab } from './settings.js';
 import { BoardStore } from './store.mjs';
 import frameHtml from './frame.html';
@@ -19,10 +19,23 @@ class BoardView extends ItemView {
 export default class TodoPlugin extends Plugin {
   async onload() {
     this.frames = new Set();
-    this.store = new BoardStore(await this.loadData(), doc => this.saveData(doc), doc => {
+    const changed = doc => {
       this.broadcast({ todoChanged: true });
-      this.settingsTab.refresh(doc);
-    });
+      this.settingsTab?.refresh(doc);
+    };
+    const vault = this.app.vault;
+    if (Platform.isDesktopApp && vault.adapter instanceof FileSystemAdapter) {
+      const { boardFile, openSharedBoard } = await import('./shared-store.mjs');
+      const dir = this.manifest.dir || `${vault.configDir}/plugins/${this.manifest.id}`;
+      const shared = await openSharedBoard(boardFile(vault.adapter.getBasePath(), dir), changed);
+      this.store = shared.store;
+      const onError = error => console.warn('[ToDo Lite] 看板同步失败', error);
+      try { this.register(shared.watchChanges(onError)); }
+      catch (error) { onError(error); }
+      this.registerDomEvent(window, 'focus', () => this.store.read().catch(onError));
+    } else {
+      this.store = new BoardStore(await this.loadData(), doc => this.saveData(doc), changed);
+    }
     this.registerView(VIEW_TYPE, leaf => new BoardView(leaf, this));
     this.addRibbonIcon('list-todo', '打开 ToDo Lite', () => this.openBoard());
     this.addCommand({ id: 'open-board', name: '打开看板', callback: () => this.openBoard() });

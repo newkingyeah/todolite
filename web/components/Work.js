@@ -10,8 +10,9 @@ import { useBoard } from "./ctx.js";
 import { Block, Md } from "./ui.js";
 import { ItemForm } from "./Item.js";
 import { HabitTable } from "./Repeat.js";
-import { OPEN, groupOf } from "../lib/model.js";
-import { dueInfo, ymd, WEEK } from "../lib/due.js";
+import { groupOf } from "../lib/model.js";
+import { dueInfo, WEEK } from "../lib/due.js";
+import { todayWork } from "../lib/work.js";
 import { repeatState } from "../lib/repeat.js";
 import { ago, dur, hoursSince } from "../lib/time.js";
 import { agentCardOf, agentDoneOf } from "../lib/theme.js";
@@ -21,33 +22,14 @@ import { playSeen } from "../lib/fx/seen.js";
 import { Seg } from "./controls.js";
 import { StatusIcon, EditIcon, LocateIcon, BackIcon } from "./icons.js";
 
-const FOCUS = ["doing", "waiting", "agent"];
 const isAgent = (i) => i.status === "agent";
 
 export function TodayBlock() {
   const { doc, ui } = useBoard();
-  const now = new Date(), todayKey = ymd(now);
+  const now = new Date();
   const cols = doc.theme?.agentCols === undefined ? 2 : Math.min(3, Math.max(1, Number(doc.theme.agentCols) || 2));
-
-  // 分区被隐藏时，它下面的事不进来（编辑布局时照旧显示）
-  const hidden = new Set(doc.sections.filter((s) => s.hidden && !ui.editMode).map((s) => s.id));
-  const live = (i) => { const g = groupOf(doc, i.group); return !!g && !hidden.has(g.section); };
-
-  const due = [];
-  for (const i of doc.items) {
-    if (!OPEN.includes(i.status) || !i.due || i.repeat?.days?.length || !live(i)) continue;
-    const info = dueInfo(i.due);
-    if (!info || info.key > todayKey) continue;
-    due.push({ i, info });
-  }
-  due.sort((a, b) => a.info.at - b.info.at);
-
-  const habits = doc.items.filter((i) => i.repeat?.days?.length && OPEN.includes(i.status) && live(i));
+  const { due, focus, habits } = todayWork(doc, now, ui.editMode);
   const left = habits.filter((i) => { const st = repeatState(i, now); return st.scheduled && !st.done; }).length;
-
-  const listed = new Set(due.map((x) => x.i.id));
-  const focus = doc.items.filter((i) => FOCUS.includes(i.status) && live(i) && !listed.has(i.id))
-    .sort((a, b) => (a.agent?.lastSeen ?? "").localeCompare(b.agent?.lastSeen ?? ""));
 
   // 在手那些如果也有截止日期，卡片上照样写出来（不在今天之前，所以只当信息用）
   const list = [...due.map(({ i, info }) => ({ i, info })), ...focus.map((i) => ({ i, info: i.due ? dueInfo(i.due) : null }))];
@@ -161,7 +143,8 @@ function WorkCard({ item: i, info }) {
 function Body({ i, info, g, stale }) {
   if (isAgent(i)) {
     const a = i.agent || {};
-    return html`<div class="where">挂在 <${Md} text=${a.where || "没写"} />${g ? ` · ${g.title}` : ""}</div>
+    const source = [a.name, a.where].filter(Boolean).join(" · ") || "没写";
+    return html`<div class="where">挂在 <${Md} text=${source} />${g ? ` · ${g.title}` : ""}</div>
       <div class="when">挂了 ${dur(a.since)}　上次看 ${ago(a.lastSeen)}${hoursSince(a.lastSeen) > stale ? html`<span class="stale">${dur(a.lastSeen)}没看了</span>` : null}</div>
       ${a.note ? html`<div class="note"><${Md} text=${a.note} /></div>` : null}`;
   }

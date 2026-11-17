@@ -5,7 +5,7 @@
 - 看板按 **今日工作 → 日历 → 分区** 排列。点击顶部的 **编辑布局** 可以新增和调整分区、卡片。
 - 设置统一放在 **Obsidian → 设置 → ToDo Lite**，修改后立即保存并更新看板。
 - 首次启用是空看板，不含演示任务，不读取原工程的 SQLite 数据。
-- 无需启动 Node 服务；任务、打卡、布局、外观设置保存在当前笔记库的 `.obsidian/plugins/todo-lite/data.json`。
+- 插件可直接使用。任务、打卡、布局和外观设置保存在当前笔记库的 `.obsidian/plugins/todo-lite/data.json`。
 - 支持任务状态、截止日期、重复打卡、今日工作和月历；保留原来的头图与特效。
 
 ## 安装
@@ -17,6 +17,10 @@
 5. 点击 **编辑布局 → ＋ 加一块新的分区**，开始建立自己的看板。
 
 升级时只替换以上三个文件，保留 `data.json`。首次安装不需要创建 `data.json`。
+
+## Agent 接入
+
+桌面端可用 [ToDo Lite MCP](docs/mcp.md) 查询今日工作和历史、编辑任务、交接并汇报进度、管理习惯打卡。Obsidian 关闭时，Agent 也能操作同一个看板。
 
 ## 设置
 
@@ -39,14 +43,15 @@ npm run package
 
 `npm run build` 生成根目录的 `main.js`；字体、前端和样式内嵌其中。`npm run package` 将三个安装文件放到 `dist/todo-lite/`。构建不包含 `data/`、测试数据或 `demo/sample.js`。
 
-`test/plugin.test.mjs` 验证插件空数据、保存与重新加载、并发操作、错误回滚。原数据/API 测试仍保留。
+`test/plugin.test.mjs` 验证插件空数据、保存与重新加载、并发操作、错误回滚。`test/mcp.test.mjs` 用 MCP 客户端验证四类操作和同机并发写入。
 
 真实 Obsidian 验收使用 `dev/test-obsidian.py`，只允许操作带有 `.todo-lite-test-vault` 标记的独立测试库，需要 Python 3.10+ 和 Playwright。详见 [测试记录](docs/testing.md)。
 
 ## 代码结构
 
 - `plugin/main.js`：Obsidian 视图、设置页、生命周期和视图间通信。
-- `plugin/store.mjs`：通过 Obsidian 的 `loadData` / `saveData` 持久化，串行处理修改，保存失败时保留原状态。
+- `plugin/store.mjs`、`plugin/shared-store.mjs`：串行处理修改，负责桌面端与 MCP 的共用文件读写。
+- `mcp/`：本地 MCP stdio 服务。
 - `plugin/frame.js`：连接原前端与插件存储；看板和设置各自隔离样式。
 - `web/`、`core/`：当前 todo-lite 的前端与任务逻辑。
 - `server/`、`canvas/`、`client.mjs`：保留的原网页服务工具。

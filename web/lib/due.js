@@ -27,10 +27,10 @@ export const dueKey = (p) => `${p.y}-${pad2(p.mo)}-${pad2(p.d)}`;
 // AoE = UTC-12: 23:59 AoE on a given day is 11:59 UTC on the next day
 const dueAt = (p) => (p.aoe ? new Date(Date.UTC(p.y, p.mo - 1, p.d, (p.hh ?? 23) + 12, p.mm ?? 59, 59)) : new Date(p.y, p.mo - 1, p.d, p.hh ?? 23, p.mm ?? 59, 59));
 
-export function dueInfo(s) {
+export function dueInfo(s, now = new Date()) {
   const p = parseDue(s);
   if (!p) return null;
-  const at = dueAt(p), now = new Date(), h = (at - now) / 3600000;
+  const at = dueAt(p), h = (at - now) / 3600000;
   const day = new Date(p.y, p.mo - 1, p.d), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   // The local day on which it is actually due: for an AoE deadline often the next day (23:59 AoE is 19:59 the next day in UTC+8)
   const atDay = new Date(at.getFullYear(), at.getMonth(), at.getDate()), dd = Math.round((atDay - today) / 86400000);

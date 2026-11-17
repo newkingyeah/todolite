@@ -50,7 +50,13 @@ export function App() {
   };
   const locate = (id) => { setPop(null); setUi((u) => ({ locate: { id, n: (u.locate?.n ?? 0) + 1 } })); };
 
-  useEffect(() => { if (doc) applyTheme(doc.theme, { demo: doc.demo }); }, [doc?.theme]);
+  useEffect(() => {
+    if (!doc) return;
+    const updateTheme = () => applyTheme(doc.theme, { demo: doc.demo });
+    updateTheme();
+    addEventListener("todo-host-theme", updateTheme);
+    return () => removeEventListener("todo-host-theme", updateTheme);
+  }, [doc?.theme, doc?.demo]);
   usePageState(ui, pop);
   useEscapeAndOutside({ pop, setPop, ui, setUi });
 

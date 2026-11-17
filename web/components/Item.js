@@ -46,7 +46,10 @@ function metaOf(i) {
   if (/^https:\/\//.test(i.source?.url ?? "")) meta.push(html`<a class="src" href=${i.source.url} target="_blank" rel="noopener noreferrer">Canvas</a>`);
   if (i.repeat?.days?.length) meta.push(html`<${RepeatBadge} item=${i} />`);
   // When a recurring item is done for today its agent is idle: show only where it runs, not how long ago it was checked
-  if (i.status === "agent") meta.push(agentActive(i) ? `挂在 ${stripMd(i.agent?.where) || "没写"} · ${ago(i.agent?.lastSeen)}看过` : `挂在 ${stripMd(i.agent?.where) || "没写"}`);
+  if (i.status === "agent") {
+    const source = [i.agent?.name, i.agent?.where].filter(Boolean).map(stripMd).join(" · ") || "没写";
+    meta.push(agentActive(i) ? `挂在 ${source} · ${ago(i.agent?.lastSeen)}看过` : `挂在 ${source}`);
+  } else if (i.agent?.name) meta.push(`Agent ${i.agent.name}`);
   if (i.status === "waiting" && i.waitingOn) meta.push(`在等 ${i.waitingOn}`);
   if (i.status === "dropped" && i.reason) meta.push(i.reason);
   if (i.status === "done" && i.doneAt) meta.push(`${ago(i.doneAt)}做完`);
@@ -87,6 +90,7 @@ export function ItemRow({ item: i, exiting = false, enter = null, leave = null }
     <div class="body">
       <div class="t"><${Md} text=${i.title} /></div>
       ${i.note ? html`<div class="n"><${Md} text=${i.note} /></div>` : null}
+      ${i.agent?.result ? html`<div class="n"><${Md} text=${`Agent 结果：${i.agent.result}`} /></div>` : null}
       ${meta.length ? html`<div class="m">${meta}</div>` : null}
     </div>
     <div class="tools">
@@ -102,18 +106,28 @@ export function ItemRow({ item: i, exiting = false, enter = null, leave = null }
 // dropped, and which card it is in. Saved only on Save (except repeat, which is saved as soon as it changes)
 export function ItemForm({ item: i }) {
   const { doc, act, setPop, openPop } = useBoard();
-  const { f, set, bind } = useForm({ title: i.title, note: i.note ?? "", due: i.due ?? "", where: i.agent?.where ?? "", anote: i.agent?.note ?? "", waitingOn: i.waitingOn ?? "", reason: i.reason ?? "", group: i.group });
+  const initial = useRef({ title: i.title, note: i.note ?? "", due: i.due ?? "", group: i.group,
+    where: i.agent?.where ?? "", anote: i.agent?.note ?? "", waitingOn: i.waitingOn ?? "", reason: i.reason ?? "" }).current;
+  const { f, set, bind } = useForm(initial);
   const box = useRef(null), first = useRef(null), dueRef = useRef(null);
   useEffect(() => {
     first.current?.focus({ preventScroll: true });
     box.current?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
   }, []);
   const save = () => {
-    const p = { title: f.title.trim(), note: f.note.trim(), due: f.due.trim(), group: f.group };
-    if (i.status === "agent") p.agent = { where: f.where.trim(), note: f.anote.trim() };
-    if (i.status === "waiting") p.waitingOn = f.waitingOn.trim();
-    if (i.status === "dropped") p.reason = f.reason.trim();
-    if (p.title) act.item(i.id).patch(p, null, { close: true });
+    if (!f.title.trim()) return;
+    // Only submit fields changed in this form so updates from another client are preserved.
+    const fields = ["title", "note", "due", "group"];
+    if (i.status === "waiting") fields.push("waitingOn");
+    if (i.status === "dropped") fields.push("reason");
+    const patch = Object.fromEntries(fields.filter(key => f[key] !== initial[key]).map(key => [key, f[key].trim()]));
+    if (i.status === "agent") {
+      const agent = {};
+      if (f.where !== initial.where) agent.where = f.where.trim();
+      if (f.anote !== initial.anote) agent.note = f.anote.trim();
+      if (Object.keys(agent).length) patch.agent = agent;
+    }
+    act.item(i.id).patch(patch, null, { close: true });
   };
   const del = () => { if (confirm(`删除“${i.title}”？`)) act.item(i.id).remove({ close: true }); };
   // The calendar button next to the due date: the picked date goes back into the input and is saved only on Save
