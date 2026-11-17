@@ -4,8 +4,7 @@ import { reducedMotion, fold, FOLD_OUT, FOLD_STAGGER } from "../lib/motion.js";
 /**
  * Animates entries entering and leaving a list: new ones unfold one after another from top to bottom; ones no longer shown
  * stay where they were and fold one after another from the bottom up, and are removed once folded.
- * Used for expanding and collapsing "N more done earlier", listing one more week in "recently done" and collapsing it, and
- * revealing and hiding again an item located from elsewhere.
+ * Used for listing one more week in "recently done" and for temporarily revealing an item located from elsewhere.
  *   list    what to show this time
  *   key     identifies an entry
  *   exists  whether an entry no longer shown still exists (deleted ones are removed at once, without folding); while it

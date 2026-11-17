@@ -1,7 +1,7 @@
 // Where closed items go and how many stay. The "done" setting has three modes (theme.closedMode):
 //   none   neither cards nor the calendar show done items
 //   recent cards keep only items done in the last few days (theme.recentDays: 1 / 3 / 7, by local date; 1 means today only);
-//          older ones collapse into a single row that expands on click. The calendar shows every done item (struck through).
+//          older ones appear in the card's expandable history panel. The calendar shows every done item with a due date.
 //          Dropped items are not shown
 //   all    done and dropped items are all shown
 // In a card, open items come first (in their own order) and done items follow, most recently done first.
@@ -30,7 +30,7 @@ export function splitClosed(items, theme, now = new Date()) {
   return { all, recent: done.filter((i) => closedAt(i) >= cutoff), older: done.filter((i) => closedAt(i) < cutoff) };
 }
 
-/** Which closed items a card shows; expanded: the "N more done earlier" row has been expanded */
+/** Which closed items are included when listing them together. */
 export function visibleClosed(items, theme, { expanded = false, now = new Date() } = {}) {
   const mode = closedModeOf(theme), s = splitClosed(items, theme, now);
   if (mode === "all") return s.all;

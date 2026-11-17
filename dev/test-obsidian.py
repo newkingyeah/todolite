@@ -104,6 +104,69 @@ with sync_playwright() as p:
         expect(board.locator('.hab .nm').filter(has_text='每日打卡验收')).to_have_count(1)
         passed('configure daily habit; check in, undo and check in again')
 
+        # Backdate fixtures in the disposable vault to exercise a long list and calendar navigation.
+        page.evaluate('''async () => {
+          const store = app.plugins.getPlugin('todo-lite').store;
+          const change = store.queue.then(async () => {
+            const doc = structuredClone(store.doc);
+            const group = doc.groups[0].id;
+            const now = new Date();
+            const due = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map(n => String(n).padStart(2, '0')).join('-');
+            for (let n = 1; n <= 12; n++) {
+              const doneAt = new Date(now.getTime() - (n + 4) * 86400000).toISOString();
+              doc.items.push({ id: `history-fixture-${n}`, group, title: `历史测试事项 ${n}`, note: '', status: 'done',
+                order: 100 + n * 10, createdAt: doneAt, updatedAt: doneAt, doneAt, ...(n === 12 ? { due } : {}) });
+            }
+            doc.rev++;
+            doc.updatedAt = now.toISOString();
+            await store.persist(doc);
+            store.doc = doc;
+            store.changed(doc);
+          });
+          store.queue = change.catch(() => {});
+          await change;
+        }''')
+        history_button = board.get_by_role('button', name='历史记录 12 条', exact=True)
+        history_panel = board.locator('.history-window')
+        expect(board.locator('.add + .closed-more')).to_have_text('历史记录 12 条')
+        expect(history_button).to_have_attribute('aria-expanded', 'false')
+        expect(history_panel).to_be_hidden()
+        history_button.click()
+        expect(history_button).to_have_attribute('aria-expanded', 'true')
+        expect(history_panel.locator('.item.done')).to_have_count(12)
+        expect(board.locator('.items .item.done')).to_have_count(1)
+        assert history_panel.evaluate('panel => panel.scrollHeight > panel.clientHeight')
+        history_panel.hover()
+        page_scroll = board.locator('html').evaluate('() => scrollY')
+        page.mouse.wheel(0, 480)
+        for _ in range(30):
+            if history_panel.evaluate('panel => panel.scrollTop > 0'):
+                break
+            page.wait_for_timeout(50)
+        assert history_panel.evaluate('panel => panel.scrollTop > 0')
+        assert abs(board.locator('html').evaluate('() => scrollY') - page_scroll) <= 1
+        history_button.click()
+        expect(history_button).to_have_attribute('aria-expanded', 'false')
+        expect(history_panel).to_be_hidden()
+        passed('history keeps the same button below Add and scrolls independently of the board')
+
+        board.locator('#b-calendar').get_by_role('button', name='历史测试事项 12', exact=True).click()
+        expect(history_button).to_have_attribute('aria-expanded', 'true')
+        old_task = history_panel.locator('[data-id="history-fixture-12"].item')
+        expect(old_task).to_have_class(re.compile(r'\blocated2?\b'))
+        old_task.hover()
+        old_task.get_by_title('编辑', exact=True).click()
+        draft_title = history_panel.get_by_placeholder('要做的事')
+        draft_title.fill('保留的历史草稿')
+        history_button.click()
+        expect(history_panel).to_be_hidden()
+        history_button.click()
+        expect(draft_title).to_have_value('保留的历史草稿')
+        history_panel.get_by_role('button', name='取消', exact=True).click()
+        history_button.click()
+        expect(history_panel).to_be_hidden()
+        passed('calendar opens and locates an older task, and hiding the panel preserves its edit draft')
+
         # Obsidian 1.14 opens Settings in a separate window; older versions use a modal.
         page.evaluate("() => { app.setting.open(); app.setting.openTabById('todo-lite'); }")
         settings_page = page_with('.todo-lite-settings')
@@ -222,7 +285,7 @@ with sync_playwright() as p:
         passed('settings inherit the Obsidian light and dark themes and fit a narrow pane')
 
         disk = page.evaluate("app.plugins.getPlugin('todo-lite').loadData()")
-        assert len(disk['items']) == 2 and disk['theme']['title'] == '验收看板'
+        assert len(disk['items']) == 14 and disk['theme']['title'] == '验收看板'
         assert next(item for item in disk['items'] if item['title'] == '每日打卡验收')['doneDates']
         page.evaluate('''async () => {
           app.workspace.getLeavesOfType('todo-lite-board').forEach(leaf => leaf.detach());
@@ -234,6 +297,7 @@ with sync_playwright() as p:
         expect(board.locator('header .brand')).to_have_text('验收看板')
         expect(board.locator('.items .item.done').filter(has_text='编辑后的待办')).to_have_count(1)
         expect(board.locator('.items .item .pill[aria-label="今天做完"]')).to_have_count(1)
+        expect(board.get_by_role('button', name='历史记录 12 条', exact=True)).to_have_attribute('aria-expanded', 'false')
         page.screenshot(path=str(shots / 'board.png'))
         passed('unload and reload plugin: layout, task status, habit check-in and settings survive')
 

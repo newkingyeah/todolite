@@ -3,8 +3,7 @@ import { useBoard } from "./ctx.js";
 import { Md, AutoText, AddInline, FormActions, MoveTools, useForm, useAutoFocus, onEnter } from "./ui.js";
 import { ItemRow } from "./Item.js";
 import { OPEN, itemsOf, sectionOf, sections } from "../lib/model.js";
-import { StatusIcon } from "./icons.js";
-import { closedModeOf, splitClosed, visibleClosed } from "../lib/done.js";
+import { closedModeOf, splitClosed } from "../lib/done.js";
 import { motionOf, reducedMotion, STRIKE_MS, ERASE_MS, MOVE_MS, WINDOW_MS } from "../lib/motion.js";
 import { useFold } from "./useFold.js";
 
@@ -33,29 +32,36 @@ function settleHeight(n) {
 
 // A card: one workstream, or one group of items within a section. no: the number assigned by position (only when a section
 // has two or more cards), which follows reordering. Open items stay on top in their original order, done items follow, newest first; in the "recent" mode
-// only items done in the last few days stay, and older ones collapse into one line, "N more done earlier", that expands on
-// click (see web/lib/done.js)
+// only recently completed items stay in the main list. Older ones appear in a separate history panel.
 export function GroupCard({ group: g, single, no = 0 }) {
-  const { doc, ui, setUi, act } = useBoard();
+  const { doc, ui, setUi, act, pop, setPop } = useBoard();
   const [expanded, setExpanded] = useState(false);
   const [, bump] = useState(0);
   const listRef = useRef(null), lastPos = useRef(null), lastH = useRef(null), lingerPrev = useRef(new Set());
   const all = itemsOf(doc, g.id), open = all.filter((i) => OPEN.includes(i.status));
-  const closed = visibleClosed(all, doc.theme, { expanded });
-  // The item being edited, or one located from the calendar or "recently done", is shown even if collapsed (so the editor
-  // can open and the highlight can be seen)
-  const want = [/^i:([^@]+)$/.exec(ui.editing ?? "")?.[1], ui.locate?.id].filter(Boolean);
-  const hidden = all.filter((i) => want.includes(i.id) && !open.includes(i) && !closed.includes(i));
+  const mode = closedModeOf(doc.theme);
+  const { all: allClosed, recent, older } = splitClosed(all, doc.theme);
+  const closed = mode === "all" ? allClosed : mode === "recent" ? recent : [];
+  const history = mode === "recent" ? older : [];
+  const historyIds = new Set(history.map((i) => i.id));
+  const editing = /^i:([^@]+)$/.exec(ui.editing ?? "")?.[1];
+  const editingHistory = historyIds.has(editing);
+  const locatedHistory = historyIds.has(ui.locate?.id) ? ui.locate.n : 0;
+  useLayoutEffect(() => {
+    if (locatedHistory || editingHistory) setExpanded(true);
+  }, [locatedHistory, editingHistory]);
+  // Keep an open editor mounted when hiding the panel, so expanding it restores the draft.
+  const historyRows = expanded ? history : history.filter((i) => i.id === editing);
+  const want = [editing, ui.locate?.id].filter(Boolean);
+  const revealed = all.filter((i) => want.includes(i.id) && !open.includes(i) && !closed.includes(i) && !historyIds.has(i.id));
   // Items just closed that the card does not keep (closedMode "none", or dropped items in "recent") stay in place a little
   // longer and leave after the strike-through and fold animations
-  const lingering = all.filter((i) => !OPEN.includes(i.status) && !hidden.includes(i) && !closed.includes(i) && motionOf(i.id) === "close");
-  const shown = [...(lingering.length ? [...open, ...lingering].sort(byOrder) : open), ...closed, ...hidden];
+  const lingering = all.filter((i) => !OPEN.includes(i.status) && !revealed.includes(i) && !closed.includes(i) && !historyIds.has(i.id) && motionOf(i.id) === "close");
+  const shown = [...(lingering.length ? [...open, ...lingering].sort(byOrder) : open), ...closed, ...revealed];
   const lingerKey = lingering.map((i) => i.id).join("|");
-  // Closed items coming and going (expanding "done earlier", collapsing it, a located item revealed and hidden again) unfold
-  // and fold one after another. Items whose status just changed (strike-through, slide) and items just hidden (closedMode
-  // "none") are not handled here
+  // Fold and unfold rows temporarily revealed here. History and status changes each have their own rendering.
   const rows = useFold(shown, (i) => i.id, {
-    exists: (id) => all.some((i) => i.id === id),
+    exists: (id) => !historyIds.has(id) && all.some((i) => i.id === id),
     ok: (i) => !OPEN.includes(i.status) && !motionOf(i.id) && !lingering.includes(i) && !lingerPrev.current.has(i.id),
   });
   lingerPrev.current = new Set(lingering.map((i) => i.id));
@@ -108,7 +114,7 @@ export function GroupCard({ group: g, single, no = 0 }) {
     for (const n of held) if (!sliding.has(n)) setTimeout(() => settleHeight(bodyOf(n)), delay); // rows that did not move: settle the height once the line is drawn
   });
   if (ui.editing === `g:${g.id}`) return html`<${GroupForm} group=${g} />`;
-  const older = closedModeOf(doc.theme) === "recent" ? splitClosed(all, doc.theme).older.length : 0;
+  const historyId = `history-${g.id}`;
   const showTitle = !(single && g.plain) && !(single && g.title === sectionOf(doc, g.section)?.title);
   const tools = html`<span class="tools">
     <${MoveTools} onMove=${act.group(g.id).move} />
@@ -121,8 +127,16 @@ export function GroupCard({ group: g, single, no = 0 }) {
     ${g.note ? html`<p class="desc"><${Md} text=${g.note} /></p>` : null}
     ${shown.length ? html`<div class=${`items ${showTitle || g.note ? "" : "flush"}`} ref=${listRef}>${rows.map(({ x: i, enter, leave }) => html`<${ItemRow} key=${i.id} item=${i} exiting=${lingering.includes(i)} enter=${enter} leave=${leave} />`)}</div>`
       : html`<div class="none">${all.length ? "都做完了。" : "还没有事。"}</div>`}
-    ${older ? html`<button class="closed-more" onClick=${() => setExpanded(!expanded)}>${expanded ? "收起" : html`<${StatusIcon} s="done" />之前还做完了 ${older} 条`}</button>` : null}
     <${AddInline} id=${`i:${g.id}`} keep label="＋ 添加" placeholder="要做的事" onSubmit=${(title) => act.addItem({ group: g.id, title })} />
+    ${history.length ? html`
+      <button type="button" class="closed-more" aria-expanded=${expanded} aria-controls=${historyId} onClick=${() => {
+        if (expanded) setPop(null);
+        setExpanded(!expanded);
+      }}>历史记录 ${history.length} 条</button>
+      <div class="history-window" id=${historyId} role="region" aria-label=${`${g.title}的历史记录`} tabindex="0" hidden=${!expanded}
+          onScroll=${() => { if (pop) setPop(null); }}>
+        ${historyRows.map((i) => html`<${ItemRow} key=${i.id} item=${i} />`)}
+      </div>` : null}
   </div>`;
 }
 

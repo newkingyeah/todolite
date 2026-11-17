@@ -219,28 +219,19 @@ if (await ev(`!!document.querySelector('.calchip')`)) {
   await ev(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })), true`); await sleep(200);
 }
 
-// 12. closed items: a card keeps only the last few days' done items and folds older ones into one line; "recently done" lists
-//     them by day; clicking an entry finds it in its card
-const fxRows = () => ev(`[...document.querySelectorAll('.card')].find((c) => c.querySelector('h3')?.textContent.includes("测试卡"))?.querySelectorAll('.items .item .t') ? [...[...document.querySelectorAll('.card')].find((c) => c.querySelector('h3')?.textContent.includes("测试卡")).querySelectorAll('.items .item .t')].map((t) => t.textContent) : null`);
-const fxMore = `[...document.querySelectorAll('.card')].find((c) => c.querySelector('h3')?.textContent.includes("测试卡"))?.querySelector('.closed-more')`;
+// 12. Closed items: recent rows stay in the main list. Earlier ones appear below Add in history.
+const fxCard = `[...document.querySelectorAll('.card')].find((c) => c.querySelector('h3')?.textContent.includes("测试卡"))`;
+const fxRows = () => ev(`Array.from(${fxCard}?.querySelectorAll('.items .item .t') ?? [], t => t.textContent)`);
+const fxMore = `${fxCard}?.querySelector('.closed-more')`;
+const fxHistory = `${fxCard}?.querySelector('.history-window')`;
 await api("PATCH", "/api/theme", { closedMode: "recent", recentDays: 3 }); await reloadPage();
 check('"最近": open items on top, just-done ones below them with the newest first, dropped ones not shown', JSON.stringify(await fxRows()) === JSON.stringify(["测试没做完一", "测试没做完二", "测试刚做完一", "测试刚做完二"]), JSON.stringify(await fxRows()));
-check("older done items fold into one line", /之前还做完了 3 条/.test(await ev(`${fxMore}?.textContent ?? ""`)));
-// Expanding and collapsing both animate the items one after another (rather than making them all appear or vanish at once)
-const fxCard = `[...document.querySelectorAll('.card')].find((c) => c.querySelector('h3')?.textContent.includes("测试卡"))`;
-const olds = `[...${fxCard}.querySelectorAll('.items .item')].filter((r) => r.querySelector('.t').textContent.startsWith("测试早做完"))`;
-await click(fxMore); await sleep(70);
-check('expanding "之前还做完了": the older done items unfold one after another (right after the click they are not full height yet and are moving)', await ev(`(() => { const rs = ${olds}; return rs.length === 3 && rs.every((r) => r.getAnimations().length > 0) && rs.some((r) => r.offsetHeight < r.scrollHeight - 2) })()`));
-await sleep(700);
-check("once expanded, the older done items are there too", (await fxRows()).length === 7 && (await ev(`${fxMore}.textContent`)) === "收起");
-check("fully expanded: every item at full height, with no animations or inline styles left over", await ev(`${olds}.every((r) => !r.getAnimations().length && !r.style.overflow && r.offsetHeight >= r.scrollHeight - 1)`));
-await click(fxMore); await sleep(70);
-check('clicking "收起": those items are still there, folding back (and cannot be clicked)', await ev(`(() => { const rs = ${olds}; return rs.length === 3 && rs.every((r) => r.classList.contains('folding') && r.getAnimations().length > 0) })()`));
-check('once folded they are removed, and the line says "之前还做完了 3 条" again', (await waitFor(`${olds}.length === 0`, 2000)) && /之前还做完了 3 条/.test(await ev(`${fxMore}.textContent`)));
-await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
-await click(fxMore); await sleep(70);
-check("with prefers-reduced-motion: expands at once, without animation", await ev(`(() => { const rs = ${olds}; return rs.length === 3 && rs.every((r) => !r.getAnimations().length) })()`));
-await send("Emulation.setEmulatedMedia", { features: [] });
+check("history is collapsed under Add", await ev(`${fxMore}?.matches('.add + .closed-more[aria-expanded="false"]') && ${fxHistory}?.hidden`));
+await click(fxMore);
+check("the same label opens a separate list of older tasks", (await waitFor(`${fxMore}?.getAttribute('aria-expanded') === 'true'`)) &&
+  await ev(`${fxMore}.textContent === '历史记录 3 条' && ${fxHistory}.querySelectorAll('.item.done').length === 3`) && (await fxRows()).length === 4);
+await click(fxMore);
+check("the same button hides the history list", (await waitFor(`${fxHistory}?.hidden`)) && (await ev(`${fxMore}.textContent`)) === "历史记录 3 条");
 check("done items have no move up / move down", !(await ev(`[...document.querySelectorAll('.items .item')].find((r) => r.querySelector('.t')?.textContent === "测试刚做完一").querySelector('.tool[title="上移"]')`)));
 await api("PATCH", "/api/theme", { closedMode: "all" }); await reloadPage();
 check('"全部": dropped items are shown too, and there is no fold line', (await fxRows()).includes("测试不做了") && !(await ev(`!!${fxMore}`)));
