@@ -55,6 +55,9 @@ with sync_playwright() as p:
         board.get_by_placeholder('新分区的名字').press('Enter')
         expect(board.get_by_role('heading', name='验收分区', exact=True)).to_be_visible()
         board.get_by_role('button', name='完成编辑', exact=True).click()
+        labels = board.locator('main > .container > section').evaluate_all('(blocks) => blocks.map(block => block.dataset.toc)')
+        assert labels == ['今日工作', '日历', '验收分区'], labels
+        passed('today, calendar and sections render in that order')
         board.get_by_role('button', name='＋ 添加', exact=True).click()
         board.get_by_placeholder('要做的事').fill('待办验收')
         board.get_by_placeholder('要做的事').press('Enter')

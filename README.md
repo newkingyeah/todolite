@@ -1,8 +1,8 @@
-# ToDo Lite for Obsidian
+# ToDo Lite · Obsidian 插件
 
-将 `todo-lite` 的今日工作、分区看板、习惯打卡和日历整合为 Obsidian 插件。
+**ToDo Lite** 是一个 Obsidian 待办插件，可以在笔记库里管理任务、查看截止日期和记录习惯打卡。
 
-- 看板顶部只有 **编辑布局** 操作按钮；点击后可新增、调整分区和卡片。
+- 看板按 **今日工作 → 日历 → 分区** 排列。点击顶部的 **编辑布局** 可以新增和调整分区、卡片。
 - 设置统一放在 **Obsidian → 设置 → ToDo Lite**，修改后立即保存并更新看板。
 - 首次启用是空看板，不含演示任务，不读取原工程的 SQLite 数据。
 - 无需启动 Node 服务；任务、打卡、布局、外观设置保存在当前笔记库的 `.obsidian/plugins/todo-lite/data.json`。
@@ -10,7 +10,7 @@
 
 ## 安装
 
-1. 下载本仓库根目录的 `main.js`、`manifest.json`、`styles.css`。
+1. 从本仓库下载 [main.js](main.js)、[manifest.json](manifest.json) 和 [styles.css](styles.css)。
 2. 在笔记库内创建 `.obsidian/plugins/todo-lite/`，把三个文件放入这个目录。
 3. 在 Obsidian 的第三方插件设置中启用 **ToDo Lite**。
 4. 点击左侧待办图标，或用命令面板执行 **ToDo Lite: 打开看板**。

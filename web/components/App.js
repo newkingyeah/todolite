@@ -62,9 +62,9 @@ export function App() {
     ${t.hero !== false ? html`<div class="container"><${Hero} theme=${t} /></div>` : null}
     <main><div class="container">
       ${t.showToday !== false ? html`<${TodayBlock} />` : null}
+      ${t.showCalendar !== false ? html`<${CalendarBlock} />` : null}
       ${shownSections(doc, ui).map((s) => html`<${SectionBlock} key=${s.id} section=${s} />`)}
       ${ui.editMode ? html`<${AddSection} />` : null}
-      ${t.showCalendar !== false ? html`<${CalendarBlock} />` : null}
     </div></main>
     ${t.showToc !== false ? html`<${Toc} />` : null}
     ${drawerOn ? html`<${Settings} shown=${drawerShown} />` : null}
