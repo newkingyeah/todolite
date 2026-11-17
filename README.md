@@ -18,9 +18,26 @@
 
 升级时只替换以上三个文件，保留 `data.json`。首次安装不需要创建 `data.json`。
 
-## Agent 接入
+## Agent 接入（MCP）
 
-桌面端可用 [ToDo Lite MCP](docs/mcp.md) 查询今日工作和历史、编辑任务、交接并汇报进度、管理习惯打卡。Obsidian 关闭时，Agent 也能操作同一个看板。
+ToDo Lite 通过 MCP 提供 **10 个 Agent 可调用的工具**，每个工具都有明确的参数和返回格式。比如你说「在工作卡里加一条周五截止的待办」，Agent 会先用 `todolite_list_cards` 找到卡片 ID，再用 `todolite_create_task` 写入任务。工具还可以查今日任务和历史、修改、完成或重开任务、交接任务并回写进度与结果，以及打卡、补打和撤销。
+
+MCP 服务由客户端在本机通过 Node.js 启动，和 Obsidian 插件读写同一份看板数据。**Obsidian 关闭时，Agent 也能操作看板**，重新打开就能看到更新。
+
+### 复制给 Agent，自动安装和配置
+
+把下面整段发给能访问本机文件和终端、支持本地 MCP 的 Agent。
+
+```text
+请帮我在本机安装 ToDo Lite Obsidian 插件，并在当前 Agent 客户端配置 todolite MCP。请直接完成安装和验证。
+
+1. 从 https://github.com/newkingyeah/todolite 下载完整仓库到固定的本地目录。准备 Node.js 22.13 或更高版本，在仓库目录执行 npm ci。
+2. 确认我要使用的 Obsidian 笔记库。能从本机配置确定就直接使用，无法确定时再问我。把仓库根目录的 main.js、manifest.json、styles.css 放到该库配置目录下的 plugins/todo-lite/，通常是 .obsidian/plugins/todo-lite/。启用 ToDo Lite，升级时保留已有 data.json。如果旧版插件正在运行，请重载插件。
+3. 在当前客户端添加名为 todolite 的本地 stdio MCP 服务。用 Node.js 启动仓库中的 mcp/server.mjs，传入 --vault 和笔记库的绝对路径。脚本也使用绝对路径。若使用自定义 Obsidian 配置目录，再传 --config-dir 和该目录在笔记库内的相对路径。
+4. 通过 MCP 调用 todolite_list_cards 做只读连通验证。如果当前客户端需要重启才能加载配置，先验证本地服务能连接，再告诉我如何让配置生效。最后报告笔记库、插件版本和验证结果。
+```
+
+手动配置和完整工具列表见 [ToDo Lite MCP 文档](docs/mcp.md)。
 
 ## 设置
 
