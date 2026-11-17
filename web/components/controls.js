@@ -25,7 +25,10 @@ export function Text({ k, value, placeholder, style, to }) {
   const save = useSave(to);
   const [v, setV] = useState(value ?? "");
   useEffect(() => setV(value ?? ""), [value]);
-  const done = () => { if ((value ?? "") !== v.trim()) save(k, v.trim()); };
+  const done = (event) => {
+    const next = (event?.currentTarget?.value ?? v).trim();
+    if ((value ?? "") !== next) save(k, next);
+  };
   return html`<input class="input" style=${style} value=${v} placeholder=${placeholder} onInput=${(e) => setV(e.target.value)} onKeyDown=${onEnter(done)} onBlur=${done} />`;
 }
 

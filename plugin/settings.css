@@ -1,0 +1,10 @@
+/* This stylesheet lives inside the settings iframe, never in the Obsidian page. */
+html, body { background: transparent; }
+.drawer-mask, .drawer-head { display: none !important; }
+.drawer {
+  position: static !important; transform: none !important;
+  width: 100% !important; max-width: none !important; height: auto !important;
+  box-shadow: none !important; border: 0 !important; overflow: visible !important;
+  padding: 0 12px 32px !important;
+}
+.settings-message { position: sticky; bottom: 0; padding: 6px 12px; background: hsl(var(--background)); min-height: 2.4em; }

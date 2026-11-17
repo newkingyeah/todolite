@@ -44,7 +44,7 @@ before(async () => {
     ],
   } });
 });
-after(() => { srv?.stop(); rmSync(MIRROR_DIR, { recursive: true, force: true }); });
+after(async () => { await srv?.stop(); rmSync(MIRROR_DIR, { recursive: true, force: true }); });
 
 test("not logged in: pages redirect to the login page and the API returns 401; health and the login page need no login", async () => {
   let r = await raw("GET", "/");

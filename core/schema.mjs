@@ -17,11 +17,14 @@ export const DEFAULT_THEME = {
   accent: "",              // empty = black and white; or any color, e.g. hsl(200 29% 45%)
   customCss: "",
   showCalendar: true,      // calendar block
+  showToday: true,         // today's work and habit table
   showRepeat: true,        // check-in block (recurring items)
   hero: true,              // header animation
   heroStyle: "landscape",      // which header animation; the list is in web/lib/heroes/index.js
   heroHeight: 220,
-  agentCols: 1,            // columns in the agent block: 1 / 2 / 3
+  agentCols: 2,            // columns in the today-work block: 1 / 2 / 3
+  agentCard: "gesture",    // agent cards: gesture (tilt on hover, double-click for checked, slide or hold for done, round icons) / buttons (the older layout)
+  agentDone: "slide",      // how a gesture card is marked done: slide (drag the knob across) / hold (press and hold)
   showToc: true,           // table of contents on the left (only when the margins are wide enough)
   closedMode: "recent",    // closed items: none = hidden / recent = only the last few days stay in cards / all (see web/lib/done.js)
   recentDays: 3,           // with closedMode recent, how many days of done items stay in cards: 1 / 3 / 7
@@ -29,6 +32,8 @@ export const DEFAULT_THEME = {
   doneChart: "bars",       // chart above "recently done": bars = two weeks of bars / heatmap (list in web/components/done/index.js)
   agentFx: "shatter",      // completion effect for agent cards, and (checkFx) for check-ins: none / random / one from the list (web/lib/fx/index.js)
   checkFx: "confetti",
+  seenFx: "ripple",        // an agent card recorded as checked: ripple / eye / glow / none / random (web/lib/fx/seen.js)
+  agentMove: "lift",       // how a checked agent card moves to the back: lift / slide / fade / spring / none (web/lib/motion.js)
 };
 // canvasGroup: the card (group id) that synced Canvas assignments go to; when empty, the first sync picks or creates a courses card
 // (see canvas/merge.mjs)

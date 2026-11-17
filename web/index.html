@@ -14,6 +14,26 @@
 </head>
 <body>
 <div id="root"></div>
+<script>
+  // 调试用：?today=2026-11-20 让整个看板以为今天是那一天（只改前端，数据不动）。
+  // 时有时无地要验证“周五的打卡表”“某天到期的事”时用，不加参数就完全无影响。
+  (() => {
+    const q = new URLSearchParams(location.search).get("today");
+    if (!q || !/^\d{4}-\d{2}-\d{2}$/.test(q)) return;
+    const [y, m, d] = q.split("-").map(Number);
+    if (!y || !m || !d) return;
+    const RealDate = Date, real = new RealDate();
+    const target = new RealDate(y, m - 1, d, real.getHours(), real.getMinutes(), real.getSeconds(), real.getMilliseconds());
+    if (Number.isNaN(target.getTime())) return;
+    const offset = target.getTime() - real.getTime();
+    class ShiftedDate extends RealDate {
+      constructor(...a) { if (a.length === 0) super(RealDate.now() + offset); else super(...a); }
+      static now() { return RealDate.now() + offset; }
+    }
+    window.Date = ShiftedDate;
+    document.documentElement.dataset.today = q;
+  })();
+</script>
 <script type="module" src="/main.js"></script>
 </body>
 </html>

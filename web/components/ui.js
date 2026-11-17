@@ -23,7 +23,7 @@ export function Block({ title, side, cls = "", id, toc, children }) {
 export const isPhone = () => matchMedia("(max-width: 640px)").matches;
 
 export const onEnter = (fn) => (e) => {
-  if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); fn(); }
+  if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); fn(e); }
 };
 
 // ---- Forms ----

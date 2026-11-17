@@ -1,111 +1,56 @@
-# ToDo
+# ToDo Lite for Obsidian
 
-A self-hosted to-do board for one person and the AI agents they hand work to.
+将 `todo-lite` 的今日工作、分区看板、习惯打卡和日历整合为 Obsidian 插件。
 
-**[Live demo](https://todo.axi404.top)** (made-up data; your changes stay in your browser)
+- 看板顶部只有 **编辑布局** 操作按钮；点击后可新增、调整分区和卡片。
+- 设置统一放在 **Obsidian → 设置 → ToDo Lite**，修改后立即保存并更新看板。
+- 首次启用是空看板，不含演示任务，不读取原工程的 SQLite 数据。
+- 无需启动 Node 服务；任务、打卡、布局、外观设置保存在当前笔记库的 `.obsidian/plugins/todo-lite/data.json`。
+- 支持任务状态、截止日期、重复打卡、今日工作和月历；保留原来的头图与特效。
 
-![The board with sample data](docs/screenshot.png)
+## 安装
 
-Besides to do, doing, waiting, done and dropped, an item can be handed to an agent. The board then records where the agent runs, since when, and when you last checked on it; it lists these items at the top, least recently checked first, and flags the ones you have not looked at for a while.
+1. 下载本仓库根目录的 `main.js`、`manifest.json`、`styles.css`。
+2. 在笔记库内创建 `.obsidian/plugins/todo-lite/`，把三个文件放入这个目录。
+3. 在 Obsidian 的第三方插件设置中启用 **ToDo Lite**。
+4. 点击左侧待办图标，或用命令面板执行 **ToDo Lite: 打开看板**。
+5. 点击 **编辑布局 → ＋ 加一块新的分区**，开始建立自己的看板。
 
-The interface is in Chinese.
+升级时只替换以上三个文件，保留 `data.json`。首次安装不需要创建 `data.json`。
 
-## Features
+## 设置
 
-- Sections, cards and items that you arrange on the page; inline Markdown in titles and notes
-- Recurring items with daily check-ins, streaks, and an optional time at which their day rolls over
-- Due dates, including AoE, and a month calendar
-- Done items stay in their card for a few days, then fold away; a chart of what got done (two weeks of bars, or a heatmap)
-- Effects when something is done or checked in, and animations in the header; all optional, and off when the system asks for reduced motion
-- Appearance settings: light or dark, font, size, width, density, layout, custom CSS
-- An optional password, and optional sync of assignments from Canvas LMS
-- A JSON API, and a small client (`client.mjs`) for agents and scripts
-- Works on phones
+打开 **设置 → ToDo Lite**。提供外观、头图、字号、宽度、布局、今日工作与日历开关、完成事项显示、特效、Agent 检查间隔、运行位置、分区显示顺序和自定义 CSS。文本框按回车或失焦保存，自定义 CSS 点击保存。
 
-The server uses only Node's standard library, including its built-in SQLite. The frontend is [Preact](https://preactjs.com/) with [htm](https://github.com/developit/htm), loaded as plain ES modules: nothing to install, nothing to build.
+插件中的“跟随系统”跟随 Obsidian 的明暗主题。布局和任务编辑仍在看板内进行。
 
-## Run it
+Canvas LMS 的服务端同步不在插件内运行；原服务端工具仍保留，使用方式见 [原网页服务文档](docs/server.md)。
 
-Needs Node 24 or later.
+## 开发与测试
+
+构建需要 Node.js 22.13 或以上版本。
 
 ```sh
-git clone https://github.com/Axi404/todo.git
-cd todo
-node server.mjs
+npm ci
+npm run build
+npm test
+npm run package
 ```
 
-Then open http://127.0.0.1:4404. The data goes to `./data/todo.db`.
+`npm run build` 生成根目录的 `main.js`；字体、前端和样式内嵌其中。`npm run package` 将三个安装文件放到 `dist/todo-lite/`。构建不包含 `data/`、测试数据或 `demo/sample.js`。
 
-| Variable | Default | |
-|---|---|---|
-| `TODO_DIR` | `./data` | data directory |
-| `TODO_PORT` | `4404` | port; the server listens on 127.0.0.1 only |
-| `TODO_PUBLIC_HOST` | | the host name behind a reverse proxy, e.g. `todo.example.com`; requests for other hosts, and changes sent from other sites, are refused |
-| `TODO_PASSWORD`, `TODO_SECRET` | | ask for a password; the secret signs the login cookie |
-| `CANVAS_HOST`, `CANVAS_TOKEN` | | sync assignments from Canvas every three hours |
-| `TZ` | the system's | what "today" means when an agent checks an item in |
+`test/plugin.test.mjs` 验证插件空数据、保存与重新加载、并发操作、错误回滚。原数据/API 测试仍保留。
 
-## Data
+真实 Obsidian 验收使用 `dev/test-obsidian.py`，只允许操作带有 `.todo-lite-test-vault` 标记的独立测试库，需要 Python 3.10+ 和 Playwright。详见 [测试记录](docs/testing.md)。
 
-Everything is in one SQLite file in the data directory, `todo.db`: the board, a log with one entry per change saying what changed and who changed it, and the state of the Canvas sync. `data.mjs` reads and writes it from the command line, in the same `TODO_DIR`:
+## 代码结构
 
-| | |
-|---|---|
-| `node data.mjs export` | the board as JSON, as `GET /api/todo` returns it |
-| `node data.mjs import <board.json> [--log <log.jsonl>] [--replace]` | load a board, and its log if given (without `--log` the log stays as it is); a board that already has items is only replaced with `--replace` |
-| `node data.mjs markdown` | the board as Markdown |
-| `node data.mjs log` | the log, one JSON line per change |
+- `plugin/main.js`：Obsidian 视图、设置页、生命周期和视图间通信。
+- `plugin/store.mjs`：通过 Obsidian 的 `loadData` / `saveData` 持久化，串行处理修改，保存失败时保留原状态。
+- `plugin/frame.js`：连接原前端与插件存储；看板和设置各自隔离样式。
+- `web/`、`core/`：当前 todo-lite 的前端与任务逻辑。
+- `server/`、`canvas/`、`client.mjs`：保留的原网页服务工具。
 
-Run it as the user the server runs as, so the files SQLite creates next to `todo.db` stay writable for the server.
+## 许可证
 
-To back up, export the board and the log, or make a consistent copy of the whole database, which works while the server runs: `sqlite3 data/todo.db "VACUUM INTO 'backup.db'"`. Copying `todo.db` itself is not enough while the server runs: the latest changes may still be in `todo.db-wal` next to it.
-
-## API
-
-`GET /api/todo` returns the board. Changes are the `POST`, `PATCH` and `DELETE` requests listed in [core/edits.mjs](core/edits.mjs); each returns the updated board. Programs say who they are with an `X-Actor` header, which goes into the log, and send `Authorization: Bearer <password>` if the board has one.
-
-`client.mjs` wraps this for agents and scripts:
-
-```js
-import { createClient } from "./client.mjs";
-
-const todo = createClient({ url: "https://todo.example.com", passwordFile: "/path/to/password", actor: "agent" });
-console.log(await todo.status());                                  // a plain-text summary of the board
-await todo.set({ item: "weekly report", status: "agent", where: "my laptop" });
-await todo.add({ group: "work", title: "Read the review" });
-```
-
-## Canvas
-
-With `CANVAS_HOST` (for example `canvas.instructure.com`) and an access token in `CANVAS_TOKEN`, the server reads your courses' assignments every three hours, and whenever you press the sync button. Assignments that are still open become items with their due dates, in a card you choose in the settings. Submitted ones are marked done. Your own edits are never overwritten, and items you delete are not imported again. The board only reads from Canvas, never writes.
-
-## Demo site
-
-`node demo/build.mjs <dir>` writes a static copy of the board with made-up data. It runs entirely in the browser: no server, no requests, and changes are gone after a reload. The [live demo](https://todo.axi404.top) is built this way.
-
-## Deploying
-
-`deploy/` installs the board on a Debian or Ubuntu server with nginx, over ssh. Copy `deploy/deploy.env.example` to `deploy/deploy.env` and fill it in. Then run `zsh deploy/setup.sh` once, and `zsh deploy/deploy.sh` for every release. Each release goes into a directory of its own and is rolled back if it does not start. The service runs as its own user with read-only code, and nginx gets a Let's Encrypt certificate. `zsh deploy/demo.sh setup`, then `zsh deploy/demo.sh`, does the same for the demo site.
-
-## Development
-
-- `node --test test/*.test.mjs`: the data layer and its storage, the API, login, the client
-- `node dev/test-board.mjs`, `dev/test-heroes.mjs`, `dev/test-demo.mjs`, `dev/test-canvas-sync.mjs`: checks that drive a headless Chrome (set `CHROME` if it is not where macOS puts it)
-- `node dev/make-icons.mjs`: redraws `web/favicon.ico` and `web/apple-touch-icon.png` from `web/favicon.svg`
-- `node dev/snapshot.mjs`: screenshots and page structure, compared before and after a change that should not change how the board looks
-
-| | |
-|---|---|
-| `server.mjs`, `server/` | HTTP: host and origin checks, login, static files, the API |
-| `core/` | the data layer: storage, items, cards and sections, places, the Markdown copy |
-| `data.mjs` | the data on the command line: export, import, Markdown, the log |
-| `web/` | the frontend; header animations in `web/lib/heroes/` (see its README), effects in `web/lib/fx/` |
-| `canvas/`, `canvas-sync.mjs` | Canvas sync |
-| `client.mjs` | the API client |
-| `demo/` | the demo site |
-| `deploy/` | deployment |
-| `dev/`, `test/` | checks |
-
-## License
-
-[MIT](LICENSE). The third-party code and font included here keep their own licenses: Preact (MIT) and htm (Apache-2.0) in [web/vendor/](web/vendor/), and the Adventor Todo font (GUST Font License) in [web/fonts/](web/fonts/).
+[MIT](LICENSE)。基于 [Axi404/todo](https://github.com/Axi404/todo) 的 todo-lite 版本改造，保留原作者版权声明。Preact、htm 与字体的许可证随源代码保留。

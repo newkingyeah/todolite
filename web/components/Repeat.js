@@ -10,13 +10,20 @@ import { cheer } from "../lib/fx/index.js";
 
 // Check-ins: recurring items as a weekly table; clicking a cell checks in or undoes the check-in
 export function RepeatBlock() {
-  const { doc, act } = useBoard();
-  const [off, setOff] = useState(0);
+  const { doc } = useBoard();
   const list = doc.items.filter((i) => i.repeat?.days?.length && OPEN.includes(i.status));
   if (!list.length) return null;
+  return html`<${Block} id="b-repeat" title="打卡"><div class="card"><${HabitTable} items=${list} /></div><//>`;
+}
+
+// 打卡表本体：一行一个习惯、七格、点格子打卡或取消，可以左右翻周。
+// 看板的「打卡」区块和今日视图共用这一个组件，所以两处长得一样、行为也一样；items 由调用方自己筛。
+export function HabitTable({ items }) {
+  const { doc, act } = useBoard();
+  const [off, setOff] = useState(0);
   const now = new Date(), week = weekOf(off, now), todayKey = ymd(now);
   let total = 0, got = 0;
-  const rows = list.map((i) => {
+  const rows = items.map((i) => {
     const done = new Set(i.doneDates ?? []), st = repeatState(i, now);
     const cells = week.map((d) => {
       const k = ymd(d), cls = `c ${k === todayKey ? "today" : ""}`;
@@ -36,7 +43,7 @@ export function RepeatBlock() {
     ];
   });
   const a = week[0], b = week[6];
-  return html`<${Block} id="b-repeat" title="打卡"><div class="card">
+  return html`<div class="hab-wrap">
     <div class="cal-head"><span class="ttl">${a.getMonth() + 1}月${a.getDate()}日 – ${b.getMonth() + 1}月${b.getDate()}日</span>
       <button class="tool" title="上一周" onClick=${() => setOff(off - 1)}>‹</button>
       <button class="tool" onClick=${() => setOff(0)}>本周</button>
@@ -49,7 +56,7 @@ export function RepeatBlock() {
       <div class="hd blank"></div>
       ${rows}
     </div>
-  </div><//>`;
+  </div>`;
 }
 
 // The pill to the left of a recurring item: shows today's state, one click checks in or undoes the check-in; on a day it

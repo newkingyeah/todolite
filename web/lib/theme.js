@@ -3,11 +3,14 @@
 
 /** How many columns the agent block uses: 1 / 2 / 3 */
 export const agentColsOf = (t) => ([1, 2, 3].includes(Number(t?.agentCols)) ? Number(t.agentCols) : 1);
+/** Agent cards: gesture (the default) or buttons (the older layout); and how a gesture card is marked done: slide or hold */
+export const agentCardOf = (t) => (t?.agentCard === "buttons" ? "buttons" : "gesture");
+export const agentDoneOf = (t) => (t?.agentDone === "hold" ? "hold" : "slide");
 
 /** demo: running as the demo site (demo/); the tab title gets a "· demo" suffix (in Chinese) */
 export function applyTheme(t = {}, { demo = false } = {}) {
   const r = document.documentElement;
-  r.dataset.mode = t.mode || "auto";
+  r.dataset.mode = window.TODO_PLUGIN && (!t.mode || t.mode === "auto") ? window.TODO_PLUGIN.hostMode : (t.mode || "auto");
   r.dataset.density = t.density || "comfortable";
   r.dataset.layout = t.layout || "sidebar";
   const font = t.font === "system" ? "-apple-system" : t.font === "default" || !t.font ? '"Adventor Todo"' : `"${t.font}"`;

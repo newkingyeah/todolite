@@ -20,7 +20,7 @@ export function Header() {
     <span class="hdr-meta">${today()} · ${ago(doc.updatedAt)}更新</span>
     <button class=${`tbtn edit-btn ${ui.editMode ? "on" : ""}`}
       onClick=${() => setUi((u) => ({ editMode: !u.editMode, editing: null, adding: null }))}>${ui.editMode ? "完成编辑" : "编辑布局"}</button>
-    <button class="tbtn" onClick=${() => setUi({ settings: true })}>设置</button>
-    <button class="tbtn" title="刷新" onClick=${() => reload(true).then(() => toast("已刷新"))}>↻</button>
+    ${!window.TODO_PLUGIN ? html`<button class="tbtn" onClick=${() => setUi({ settings: true })}>设置</button>
+    <button class="tbtn" title="刷新" onClick=${() => reload(true).then(() => toast("已刷新"))}>↻</button>` : null}
   </div></div></header>`;
 }

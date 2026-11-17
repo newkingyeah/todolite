@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import net from "node:net";
+import { once } from "node:events";
 import { openStore } from "../core/store.mjs";
 
 const SERVER = join(dirname(fileURLToPath(import.meta.url)), "..", "server.mjs");
@@ -32,6 +33,14 @@ export async function startServer({ dir, data, env = {} } = {}) {
     get stderr() { return stderr; },
     /** Every entry of the log, as { ts, actor, op, ... } */
     log: () => store.readLog(),
-    stop: () => { proc.kill(); store.close(); if (own) rmSync(dir, { recursive: true, force: true }); },
+    stop: async () => {
+      if (proc.exitCode === null && proc.signalCode === null) {
+        const exited = once(proc, 'exit');
+        proc.kill();
+        await exited;
+      }
+      store.close();
+      if (own) rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    },
   };
 }

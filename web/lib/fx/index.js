@@ -13,13 +13,14 @@ import * as confetti from "./confetti.js";
 import * as shatter from "./shatter.js";
 import * as dust from "./dust.js";
 import * as stamp from "./stamp.js";
+import * as tear from "./tear.js";
 import * as fireworks from "./fireworks.js";
 import * as pop from "./pop.js";
 import * as ripple from "./ripple.js";
 
-const BY_ID = Object.fromEntries([confetti, shatter, dust, stamp, fireworks, pop, ripple].map((m) => [m.meta.id, m]));
+const BY_ID = Object.fromEntries([confetti, shatter, dust, stamp, tear, fireworks, pop, ripple].map((m) => [m.meta.id, m]));
 const LISTS = {
-  agent: ["confetti", "shatter", "dust", "stamp", "fireworks"],
+  agent: ["confetti", "shatter", "dust", "stamp", "tear", "fireworks"],
   check: ["confetti", "pop", "fireworks", "ripple"],
 };
 const KEYS = { agent: "agentFx", check: "checkFx" };
@@ -55,7 +56,7 @@ export async function leaveCard(card, origin, theme, save) {
   if (!card || card.dataset.leaving) return;
   card.dataset.leaving = "1"; // not clickable while the effect plays (pointer-events: none in the stylesheet)
   const fx = celebrate("agent", theme, card, origin);
-  const fade = fx?.took ? null : card.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(.98)" }], { duration: reducedMotion() ? 0 : 220, easing: "ease", fill: "forwards" });
+  const fade = fx?.took ? null : card.animate([{ opacity: 1, scale: 1 }, { opacity: 0, scale: 0.98 }], { duration: reducedMotion() ? 0 : 220, easing: "ease", fill: "forwards" });
   await Promise.all([fx?.ready, fade?.finished.catch(() => {})]);
   if (await save()) return;
   fade?.cancel();

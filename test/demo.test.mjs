@@ -121,7 +121,7 @@ test("static build: only what the browser needs, and every import resolves", () 
     const site = join(out, "site");
     const files = build(site);
     const walk = (d) => readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [join(d, f).slice(site.length + 1)]));
-    assert.deepEqual(walk(site).sort(), [...files].sort(), "the files written are exactly the ones listed");
+    assert.deepEqual(walk(site).map(f => f.replaceAll('\\', '/')).sort(), [...files].sort(), "the files written are exactly the ones listed");
     assert.ok(files.includes("core/edits.mjs") && files.includes("web/components/App.js") && files.includes("demo/sample.js"));
     for (const f of files) assert.ok(!/^(server|canvas|deploy|test|dev)\/|store\.mjs$|report\.mjs$|^demo\/build\.mjs$|package\.json$|\.md$/.test(f), `should not be included: ${f}`);
     for (const f of files.filter((f) => /\.m?js$/.test(f))) {

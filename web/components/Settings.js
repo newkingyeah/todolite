@@ -7,14 +7,16 @@ import { CanvasSettings } from "./Canvas.js";
 import { CHARTS, chartById } from "./done/index.js";
 import { HEROES, heroById } from "../lib/heroes/index.js";
 import { closedModeOf, recentDaysOf } from "../lib/done.js";
-import { agentColsOf } from "../lib/theme.js";
+import { agentColsOf, agentCardOf, agentDoneOf } from "../lib/theme.js";
 import { fxOptions, fxOf, preview } from "../lib/fx/index.js";
+import { seenFxOptions, seenFxOf, playSeen } from "../lib/fx/seen.js";
+import { MOVES, moveOf, moveAnimation } from "../lib/motion.js";
 import { sections } from "../lib/model.js";
 
 // The settings drawer that slides in from the right: appearance, effects, reminders, Canvas, places, section order,
 // custom CSS.
 // Changes are saved right away (a Range once it stops moving)
-export function Settings({ shown }) {
+export function Settings({ shown, embedded = false }) {
   const { doc, setUi, act } = useBoard();
   const t = doc.theme || {};
   const close = () => setUi({ settings: false });
@@ -31,32 +33,33 @@ export function Settings({ shown }) {
     <${Field} label="圆角"><${Range} k="radius" min=${0} max=${24} step=${1} value=${t.radius ?? 12} unit="px" cssVar="--radius" /><//>
     <${Field} label="密度"><${Seg} k="density" cur=${t.density} opts=${[["comfortable", "宽松"], ["compact", "紧凑"]]} /><//>
     <${Field} label="排版"><${Seg} k="layout" cur=${t.layout} opts=${[["sidebar", "左标题右卡片"], ["stacked", "标题在上"]]} /><//>
-    <${Field} label="Agent 排列"><${Seg} k="agentCols" cur=${agentColsOf(t)} opts=${[[1, "一列"], [2, "两列"], [3, "三列"]]} /><//>
+    <${Field} label="卡片排列"><${Seg} k="agentCols" cur=${agentColsOf(t)} opts=${[[1, "一列"], [2, "两列"], [3, "三列"]]} /><//>
+    <${Field} label="今日工作卡片"><${Seg} k="agentCard" cur=${agentCardOf(t)} opts=${[["gesture", "新版"], ["buttons", "旧版"]]} /><//>
+    ${agentCardOf(t) === "gesture" ? html`<${Field} label="卡片上做完"><${Seg} k="agentDone" cur=${agentDoneOf(t)} opts=${[["slide", "滑动"], ["hold", "长按"]]} /><//>` : null}
     <${Field} label="头图"><${Toggle} k="hero" value=${t.hero} /><//>
     <${Field} label="头图样式"><select class="input" value=${heroById(t.heroStyle).id} onChange=${(e) => act.theme({ heroStyle: e.target.value })}>
       ${HEROES.map((x) => html`<option key=${x.id} value=${x.id}>${x.name}</option>`)}
     </select><//>
     <${Field} label="头图高度"><${Range} k="heroHeight" min=${140} max=${360} step=${10} value=${t.heroHeight ?? 220} unit="px" cssVar="--hero-h" /><//>
-    <${Field} label="概览数字"><${Toggle} k="showStats" value=${t.showStats} /><//>
-    <${Field} label="打卡"><${Toggle} k="showRepeat" value=${t.showRepeat} /><//>
+    <${Field} label="今日工作"><${Toggle} k="showToday" value=${t.showToday} /><//>
     <${Field} label="日历"><${Toggle} k="showCalendar" value=${t.showCalendar} /><//>
     <${Field} label="目录"><${Toggle} k="showToc" value=${t.showToc} /><//>
-    <${Field} label="最近做完"><${Toggle} k="showDone" value=${t.showDone} /><//>
-    ${t.showDone !== false ? html`<${Field} label="最近做完的图"><${Seg} k="doneChart" cur=${chartById(t.doneChart).id} opts=${CHARTS.map((c) => [c.id, c.name])} /><//>` : null}
     <${Field} label="做完的"><${Seg} k="closedMode" cur=${closedModeOf(t)} opts=${[["none", "不显示"], ["recent", "最近"], ["all", "全部"]]} /><//>
     ${closedModeOf(t) === "recent" ? html`<${Field} label="留几天"><${Seg} k="recentDays" cur=${recentDaysOf(t)} opts=${[[1, "1 天"], [3, "3 天"], [7, "7 天"]]} /><//>` : null}
     <${Field} label="强调色" cls="accent-field"><${AccentPicker} value=${t.accent} /><//>
     <h4>效果</h4>
     <${Field} label="Agent 做完时" cls="chips-field"><${FxChips} kind="agent" k="agentFx" cur=${fxOf(t, "agent")} /><//>
     <${Field} label="打卡时" cls="chips-field"><${FxChips} kind="check" k="checkFx" cur=${fxOf(t, "check")} /><//>
+    <${Field} label="看过了时" cls="chips-field"><${Chips} k="seenFx" cur=${seenFxOf(t)} opts=${seenFxOptions()} play=${seenPreview} /><//>
+    <${Field} label="看过以后" cls="chips-field"><${Chips} k="agentMove" cur=${moveOf(t)} opts=${MOVES} play=${movePreview} /><//>
     <h4>提醒</h4>
     <${Field} label="多久没看算久"><${Range} k="staleHours" min=${1} max=${24} step=${1} value=${doc.settings?.staleHours ?? 3} unit="h" to="settings" /><//>
-    <${CanvasSettings} />
+    ${!embedded ? html`<${CanvasSettings} />` : null}
     <h4>Agent 挂在哪</h4>
     <${PlacesEditor} />
     <h4>分区</h4>
     <${SectionList} />
-    <div class="row" style="margin-top:10px"><button class="btn" onClick=${() => setUi({ settings: false, editMode: true })}>编辑布局</button></div>
+    ${!embedded ? html`<div class="row" style="margin-top:10px"><button class="btn" onClick=${() => setUi({ settings: false, editMode: true })}>编辑布局</button></div>` : null}
     <h4>自定义 CSS</h4>
     <${CustomCss} value=${t.customCss} />
   </aside>`;
@@ -69,6 +72,17 @@ function FxChips({ kind, k, cur }) {
   const choose = (id, e) => { if (id !== cur) act.theme({ [k]: id }); preview(kind, id, row.current, e.currentTarget); };
   return html`<span class="chips" ref=${row}>${fxOptions(kind).map(([id, name]) => html`<button key=${id} class=${`chip ${cur === id ? "on" : ""}`} onClick=${(e) => choose(id, e)}>${name}</button>`)}</span>`;
 }
+
+// The same kind of row for the "checked" effect and for how a checked card moves: clicking one selects it and plays it on
+// the option itself
+function Chips({ k, cur, opts, play }) {
+  const { act } = useBoard();
+  const choose = (id, e) => { if (id !== cur) act.theme({ [k]: id }); play(id, e.currentTarget); };
+  return html`<span class="chips">${opts.map(([id, name]) => html`<button key=${id} class=${`chip ${cur === id ? "on" : ""}`} onClick=${(e) => choose(id, e)}>${name}</button>`)}</span>`;
+}
+// the checked effect plays on the row of options, from the option clicked
+const seenPreview = (id, chip) => { const r = chip.getBoundingClientRect(); playSeen(null, chip.parentElement, r.left + r.width / 2, r.top + r.height / 2, id); };
+const movePreview = (id, chip) => { if (id !== "none") chip.animate(...moveAnimation(id, -28, 0).self); };
 
 // Accent color: a few presets, or type any color
 const ACCENTS = ["", "hsl(200 29% 45%)", "hsl(262 32% 52%)", "hsl(150 25% 38%)", "hsl(14 70% 50%)"];

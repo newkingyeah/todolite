@@ -1,13 +1,23 @@
 {
-  "name": "todo",
+  "name": "obsidian-todo-lite",
   "private": true,
-  "description": "A self-hosted to-do board for working alongside AI agents",
+  "description": "Obsidian local task board, habit check-ins and calendar",
   "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test test/*.test.mjs",
-    "test:browser": "node dev/test-board.mjs && node dev/test-heroes.mjs && node dev/test-demo.mjs && node dev/test-canvas-sync.mjs"
-  }
+    "test:browser": "node dev/test-board.mjs && node dev/test-heroes.mjs && node dev/test-demo.mjs && node dev/test-canvas-sync.mjs",
+    "build": "node plugin/build.mjs",
+    "test:plugin": "node --test test/plugin.test.mjs",
+    "package": "npm run build && node plugin/package.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "obsidian": "1.14.4"
+  },
+  "version": "1.0.0"
 }
