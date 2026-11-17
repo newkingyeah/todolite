@@ -1,3 +1,18 @@
 .todo-lite-board-frame { border: 0; width: 100%; height: 100%; display: block; }
-.todo-lite-settings-frame { border: 0; width: 100%; height: 70vh; min-height: 500px; display: block; }
 .workspace-leaf-content[data-type="todo-lite-board"] .view-content { padding: 0; overflow: hidden; }
+
+.todo-lite-settings { min-width: 0; container: todo-lite-settings / inline-size; }
+.todo-lite-settings [hidden] { display: none !important; }
+.todo-lite-settings .setting-item-info { min-width: 0; overflow-wrap: anywhere; }
+.todo-lite-settings .setting-item-control { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.todo-lite-settings .setting-item-control :is(input, select, textarea) { min-width: 0; max-width: 100%; }
+.todo-lite-settings .todo-lite-css-row { display: block; }
+.todo-lite-settings .todo-lite-css-row .setting-item-info { margin: 0 0 var(--size-4-2); }
+.todo-lite-settings .todo-lite-css-row textarea { width: 100%; font-family: var(--font-monospace); resize: vertical; }
+.todo-lite-effect-preview iframe { display: block; width: 100%; height: 9rem; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
+
+@container todo-lite-settings (max-width: 420px) {
+  .todo-lite-settings .setting-item:not(.setting-item-heading) { flex-wrap: wrap; gap: var(--size-4-2); }
+  .todo-lite-settings .setting-item-info { flex: 1 1 100%; margin: 0; }
+  .todo-lite-settings .setting-item-control { flex: 1 1 100%; justify-content: flex-start; }
+}

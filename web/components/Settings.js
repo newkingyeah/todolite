@@ -7,7 +7,7 @@ import { CanvasSettings } from "./Canvas.js";
 import { CHARTS, chartById } from "./done/index.js";
 import { HEROES, heroById } from "../lib/heroes/index.js";
 import { closedModeOf, recentDaysOf } from "../lib/done.js";
-import { agentColsOf, agentCardOf, agentDoneOf } from "../lib/theme.js";
+import { ACCENT_OPTIONS, agentColsOf, agentCardOf, agentDoneOf } from "../lib/theme.js";
 import { fxOptions, fxOf, preview } from "../lib/fx/index.js";
 import { seenFxOptions, seenFxOf, playSeen } from "../lib/fx/seen.js";
 import { MOVES, moveOf, moveAnimation } from "../lib/motion.js";
@@ -16,7 +16,7 @@ import { sections } from "../lib/model.js";
 // The settings drawer that slides in from the right: appearance, effects, reminders, Canvas, places, section order,
 // custom CSS.
 // Changes are saved right away (a Range once it stops moving)
-export function Settings({ shown, embedded = false }) {
+export function Settings({ shown }) {
   const { doc, setUi, act } = useBoard();
   const t = doc.theme || {};
   const close = () => setUi({ settings: false });
@@ -54,12 +54,12 @@ export function Settings({ shown, embedded = false }) {
     <${Field} label="看过以后" cls="chips-field"><${Chips} k="agentMove" cur=${moveOf(t)} opts=${MOVES} play=${movePreview} /><//>
     <h4>提醒</h4>
     <${Field} label="多久没看算久"><${Range} k="staleHours" min=${1} max=${24} step=${1} value=${doc.settings?.staleHours ?? 3} unit="h" to="settings" /><//>
-    ${!embedded ? html`<${CanvasSettings} />` : null}
+    <${CanvasSettings} />
     <h4>Agent 挂在哪</h4>
     <${PlacesEditor} />
     <h4>分区</h4>
     <${SectionList} />
-    ${!embedded ? html`<div class="row" style="margin-top:10px"><button class="btn" onClick=${() => setUi({ settings: false, editMode: true })}>编辑布局</button></div>` : null}
+    <div class="row" style="margin-top:10px"><button class="btn" onClick=${() => setUi({ settings: false, editMode: true })}>编辑布局</button></div>
     <h4>自定义 CSS</h4>
     <${CustomCss} value=${t.customCss} />
   </aside>`;
@@ -85,11 +85,10 @@ const seenPreview = (id, chip) => { const r = chip.getBoundingClientRect(); play
 const movePreview = (id, chip) => { if (id !== "none") chip.animate(...moveAnimation(id, -28, 0).self); };
 
 // Accent color: a few presets, or type any color
-const ACCENTS = ["", "hsl(200 29% 45%)", "hsl(262 32% 52%)", "hsl(150 25% 38%)", "hsl(14 70% 50%)"];
 function AccentPicker({ value = "" }) {
   const { act } = useBoard();
   return html`<span class="accents">
-    ${ACCENTS.map((c) => html`<button key=${c} class=${`swatch ${value === c ? "on" : ""}`} title=${c || "黑白"} style=${{ background: c || "hsl(var(--foreground))" }} onClick=${() => act.theme({ accent: c })}></button>`)}
+    ${ACCENT_OPTIONS.map(([c, label]) => html`<button key=${c} class=${`swatch ${value === c ? "on" : ""}`} title=${label} style=${{ background: c || "hsl(var(--foreground))" }} onClick=${() => act.theme({ accent: c })}></button>`)}
     <${Text} k="accent" value=${value} placeholder="其他颜色" />
   </span>`;
 }

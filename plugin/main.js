@@ -1,37 +1,33 @@
-import { Plugin, ItemView, PluginSettingTab } from 'obsidian';
+import { Plugin, ItemView } from 'obsidian';
+import { TodoSettingsTab } from './settings.js';
 import { BoardStore } from './store.mjs';
 import frameHtml from './frame.html';
 
 const VIEW_TYPE = 'todo-lite-board';
+const frameDocument = config => frameHtml.replace('<!--TODO_CONFIG-->', () =>
+  `<script>window.TODO_PLUGIN=${JSON.stringify(config).replaceAll('<', '\\u003c')}</script>`);
 
 class BoardView extends ItemView {
   constructor(leaf, plugin) { super(leaf); this.plugin = plugin; }
   getViewType() { return VIEW_TYPE; }
   getDisplayText() { return 'ToDo Lite'; }
   getIcon() { return 'list-todo'; }
-  async onOpen() { this.disposeFrame = this.plugin.mount(this.contentEl, false); }
+  async onOpen() { this.disposeFrame = this.plugin.mountBoard(this.contentEl); }
   async onClose() { this.disposeFrame?.(); }
-}
-
-class TodoSettingsTab extends PluginSettingTab {
-  constructor(app, plugin) { super(app, plugin); this.plugin = plugin; }
-  display() {
-    this.hide();
-    this.containerEl.empty();
-    this.containerEl.createEl('h2', { text: 'ToDo Lite 设置' });
-    this.disposeFrame = this.plugin.mount(this.containerEl, true);
-  }
-  hide() { this.disposeFrame?.(); this.disposeFrame = null; }
 }
 
 export default class TodoPlugin extends Plugin {
   async onload() {
     this.frames = new Set();
-    this.store = new BoardStore(await this.loadData(), doc => this.saveData(doc), () => this.broadcast({ todoChanged: true }));
+    this.store = new BoardStore(await this.loadData(), doc => this.saveData(doc), doc => {
+      this.broadcast({ todoChanged: true });
+      this.settingsTab.refresh(doc);
+    });
     this.registerView(VIEW_TYPE, leaf => new BoardView(leaf, this));
     this.addRibbonIcon('list-todo', '打开 ToDo Lite', () => this.openBoard());
     this.addCommand({ id: 'open-board', name: '打开看板', callback: () => this.openBoard() });
-    this.addSettingTab(new TodoSettingsTab(this.app, this));
+    this.settingsTab = new TodoSettingsTab(this.app, this);
+    this.addSettingTab(this.settingsTab);
     this.registerEvent(this.app.workspace.on('css-change', () => this.broadcast({ todoHostTheme: this.hostTheme() })));
   }
 
@@ -46,16 +42,15 @@ export default class TodoPlugin extends Plugin {
     await this.app.workspace.revealLeaf(leaf);
   }
 
-  mount(container, settings) {
+  mountBoard(container) {
     const element = container.createEl('iframe', {
-      cls: settings ? 'todo-lite-settings-frame' : 'todo-lite-board-frame',
-      attr: { title: settings ? 'ToDo Lite 设置' : 'ToDo Lite 看板', sandbox: 'allow-scripts allow-modals allow-popups allow-popups-to-escape-sandbox' },
+      cls: 'todo-lite-board-frame',
+      attr: { title: 'ToDo Lite 看板', sandbox: 'allow-scripts allow-modals allow-popups allow-popups-to-escape-sandbox' },
     });
     const frame = { element, port: null };
     this.frames.add(frame);
     const token = crypto.randomUUID();
-    // A transferred port works even when Settings is in another Obsidian window.
-    // It also keeps requests private to this particular mounted iframe.
+    // Only this mounted board receives the port used to edit its data.
     const connect = () => {
       frame.port?.close();
       const channel = new MessageChannel();
@@ -64,14 +59,18 @@ export default class TodoPlugin extends Plugin {
       element.contentWindow.postMessage({ todoConnect: token }, '*', [channel.port2]);
     };
     element.addEventListener('load', connect);
-    const config = { settings, hostMode: this.hostTheme(), token };
-    element.srcdoc = frameHtml.replace('<!--TODO_CONFIG-->', `<script>window.TODO_PLUGIN=${JSON.stringify(config)}</script>`);
+    element.srcdoc = frameDocument({ hostMode: this.hostTheme(), token });
     return () => {
       element.removeEventListener('load', connect);
       frame.port?.close();
       this.frames.delete(frame);
       element.remove();
     };
+  }
+
+  mountEffectPreview(container, kind, effect) {
+    const frame = container.createEl('iframe', { attr: { title: '动效示例', sandbox: 'allow-scripts' } });
+    frame.srcdoc = frameDocument({ hostMode: this.hostTheme(), preview: { kind, effect } });
   }
 
   broadcast(message) {
@@ -94,6 +93,7 @@ export default class TodoPlugin extends Plugin {
   }
 
   onunload() {
+    this.settingsTab?.hide();
     for (const frame of this.frames) { frame.port?.close(); frame.element.remove(); }
     this.frames.clear();
   }

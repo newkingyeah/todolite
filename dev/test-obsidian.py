@@ -29,6 +29,15 @@ with sync_playwright() as p:
         existing.on('pageerror', lambda error: errors.append(str(error)))
     context.on('page', lambda new_page: new_page.on('pageerror', lambda error: errors.append(str(error))))
     page.on('dialog', lambda dialog: dialog.accept())
+
+    def page_with(selector):
+        for _ in range(80):
+            found = next((candidate for candidate in context.pages if candidate.locator(selector).count()), None)
+            if found:
+                return found
+            page.wait_for_timeout(100)
+        raise AssertionError(f'Missing {selector}')
+
     try:
         # Reset test fixtures through the host in the verified disposable vault.
         page.evaluate('''async () => {
@@ -97,31 +106,120 @@ with sync_playwright() as p:
 
         # Obsidian 1.14 opens Settings in a separate window; older versions use a modal.
         page.evaluate("() => { app.setting.open(); app.setting.openTabById('todo-lite'); }")
-        settings_page = None
-        for _ in range(80):
-            settings_page = next((candidate for candidate in context.pages if candidate.locator('iframe.todo-lite-settings-frame').count()), None)
-            if settings_page: break
-            page.wait_for_timeout(100)
-        assert settings_page, 'Settings frame missing'
-        settings = settings_page.frame_locator('iframe.todo-lite-settings-frame')
-        expect(settings.get_by_text('外观', exact=True)).to_be_visible()
+        settings_page = page_with('.todo-lite-settings')
+        settings = settings_page.locator('.todo-lite-settings')
+        expect(settings.locator('.setting-item-heading').get_by_text('外观', exact=True)).to_be_visible()
+        expect(settings.locator('iframe')).to_have_count(0)
         expect(settings.get_by_role('button', name='编辑布局', exact=True)).to_have_count(0)
-        title = settings.locator('.field').filter(has=settings.locator('span', has_text=re.compile('^标题$')))
-        title.locator('input').fill('验收看板')
-        title.locator('input').press('Enter')
+        title = settings.get_by_label('看板标题', exact=True)
+        title.fill('验收看板')
+        title.press('Enter')
         expect(board.locator('header .brand')).to_have_text('验收看板')
-        today = settings.locator('.field').filter(has=settings.locator('span', has_text=re.compile('^今日工作$')))
-        today.get_by_role('button', name='不显示', exact=True).click()
+        today = settings.get_by_label('显示今日工作', exact=True)
+        today.click()
         expect(board.get_by_role('heading', name='今日工作', exact=True)).to_have_count(0)
-        today.get_by_role('button', name='显示', exact=True).click()
+        today.click()
         expect(board.get_by_role('heading', name='今日工作', exact=True)).to_be_visible()
-        mode = settings.locator('.field').filter(has=settings.locator('span', has_text=re.compile('^明暗$')))
-        mode.get_by_role('button', name='暗', exact=True).click()
+        mode = settings.get_by_label('看板主题', exact=True)
+        mode.select_option('dark')
         expect(board.locator('html')).to_have_attribute('data-mode', 'dark')
-        mode.get_by_role('button', name='跟随系统', exact=True).click()
-        settings_page.screenshot(path=str(shots / 'settings.png'))
-        page.evaluate('() => { app.setting.close(); }')
-        passed('Obsidian settings window saves title, visibility and appearance; board updates immediately')
+        font_size = settings.get_by_label('字号', exact=True)
+        font_size.press('ArrowRight')
+        expect(font_size).to_have_value('15.5')
+        expect(board.locator('html')).to_have_attribute('style', re.compile(r'--fs:\s*15\.5px'))
+        card_style = settings.get_by_label('今日工作卡片', exact=True)
+        card_style.select_option('buttons')
+        expect(settings.get_by_label('标记完成的手势', exact=True)).to_be_hidden()
+        card_style.select_option('gesture')
+        expect(settings.get_by_label('标记完成的手势', exact=True)).to_be_visible()
+        passed('native text, toggle, slider and dropdown save and immediately update the board')
+
+        font = settings.get_by_label('看板字体', exact=True)
+        font.select_option(label='自定义')
+        custom_font = settings.get_by_label('自定义看板字体', exact=True)
+        custom_font.fill('Microsoft YaHei')
+        custom_font.press('Tab')
+        page.wait_for_function("app.plugins.getPlugin('todo-lite').store.doc.theme.font === 'Microsoft YaHei'")
+        font.select_option('default')
+        expect(custom_font).to_be_hidden()
+
+        section = settings.get_by_label('显示分区 验收分区', exact=True)
+        section.click()
+        expect(board.get_by_role('heading', name='验收分区', exact=True)).to_have_count(0)
+        section.click()
+        expect(board.get_by_role('heading', name='验收分区', exact=True)).to_be_visible()
+
+        location = settings.get_by_label('新运行位置', exact=True)
+        location.fill('临时 Agent')
+        location.press('Enter')
+        expect(settings.get_by_text('临时 Agent', exact=True)).to_be_visible()
+        settings.get_by_role('button', name='重命名', exact=True).click()
+        rename_page = page_with('.modal input[aria-label="位置名称"]')
+        renamed = rename_page.get_by_label('位置名称', exact=True)
+        renamed.fill('新位置')
+        renamed.press('Enter')
+        expect(settings.get_by_text('新位置', exact=True)).to_be_visible()
+        settings.get_by_role('button', name='移除', exact=True).click()
+        expect(settings.get_by_text('新位置', exact=True)).to_have_count(0)
+        passed('custom font, section visibility and Agent location management work in native settings')
+
+        settings.get_by_role('button', name='预览打卡完成').click()
+        preview = settings.frame_locator('iframe[title="动效示例"]')
+        expect(preview.locator('.card')).to_be_visible()
+        settings.get_by_role('button', name='收起', exact=True).click()
+        expect(settings.locator('iframe')).to_have_count(0)
+
+        css = settings.get_by_label('看板 CSS', exact=True)
+        css.fill('.card { border-width: 2px; }')
+        settings.get_by_role('button', name='保存 CSS', exact=True).click()
+        expect(board.locator('#b-calendar .card').first).to_have_css('border-top-width', '2px')
+        settings.get_by_role('button', name='恢复默认外观', exact=True).click()
+        reset_page = page_with('.modal-title:text-is("恢复默认外观")')
+        reset = reset_page.locator('.modal').filter(has_text='看板主题、布局、头图、动效和自定义 CSS 将恢复默认值。')
+        reset.get_by_role('button', name='取消', exact=True).click()
+        expect(css).to_have_value('.card { border-width: 2px; }')
+        settings.get_by_role('button', name='恢复默认外观', exact=True).click()
+        reset.get_by_role('button', name='恢复', exact=True).click()
+        expect(css).to_have_value('')
+        expect(title).to_have_value('ToDo')
+        title.fill('验收看板')
+        title.press('Enter')
+        expect(board.locator('header .brand')).to_have_text('验收看板')
+        passed('effect preview, custom CSS and confirmed reset work without changing tasks')
+
+        original_theme = page.evaluate("app.vault.getConfig('theme')")
+        try:
+            page.evaluate("() => { app.changeTheme('moonstone'); app.updateTheme(); }")
+            expect(settings_page.locator('body')).to_have_class(re.compile(r'\btheme-light\b'))
+            light_text = title.evaluate('element => getComputedStyle(element).color')
+            title.scroll_into_view_if_needed()
+            settings_page.screenshot(path=str(shots / 'settings-light.png'))
+            page.evaluate("() => { app.changeTheme('obsidian'); app.updateTheme(); }")
+            expect(settings_page.locator('body')).to_have_class(re.compile(r'\btheme-dark\b'))
+            expect(board.locator('html')).to_have_attribute('data-mode', 'dark')
+            assert title.evaluate('element => getComputedStyle(element).color') != light_text
+            mode.select_option('light')
+            expect(board.locator('html')).to_have_attribute('data-mode', 'light')
+            expect(settings_page.locator('body')).to_have_class(re.compile(r'\btheme-dark\b'))
+            mode.select_option('auto')
+            expect(board.locator('html')).to_have_attribute('data-mode', 'dark')
+            settings_page.screenshot(path=str(shots / 'settings-dark.png'))
+
+            # Restrict the content slot to a narrow pane for a deterministic layout check.
+            settings.evaluate("panel => { panel.style.maxWidth = '360px'; }")
+            narrow = settings.evaluate('''panel => {
+              const input = panel.querySelector('[aria-label="看板标题"]');
+              const label = input.closest('.setting-item').querySelector('.setting-item-name');
+              return { width: panel.clientWidth, scrollWidth: panel.scrollWidth,
+                stacked: input.getBoundingClientRect().top >= label.getBoundingClientRect().bottom };
+            }''')
+            assert narrow['width'] <= 360 and narrow['scrollWidth'] <= narrow['width'] and narrow['stacked'], narrow
+            settings_page.screenshot(path=str(shots / 'settings-narrow.png'))
+            settings.evaluate("panel => { panel.style.removeProperty('max-width'); }")
+        finally:
+            page.evaluate("theme => { app.changeTheme(theme || 'system'); app.updateTheme(); }", original_theme)
+            page.evaluate('() => { app.setting.close(); }')
+        passed('settings inherit the Obsidian light and dark themes and fit a narrow pane')
 
         disk = page.evaluate("app.plugins.getPlugin('todo-lite').loadData()")
         assert len(disk['items']) == 2 and disk['theme']['title'] == '验收看板'

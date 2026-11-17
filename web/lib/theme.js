@@ -7,6 +7,14 @@ export const agentColsOf = (t) => ([1, 2, 3].includes(Number(t?.agentCols)) ? Nu
 export const agentCardOf = (t) => (t?.agentCard === "buttons" ? "buttons" : "gesture");
 export const agentDoneOf = (t) => (t?.agentDone === "hold" ? "hold" : "slide");
 
+export const ACCENT_OPTIONS = [
+  ["", "默认（黑白）"],
+  ["hsl(200 29% 45%)", "蓝色"],
+  ["hsl(262 32% 52%)", "紫色"],
+  ["hsl(150 25% 38%)", "绿色"],
+  ["hsl(14 70% 50%)", "橙色"],
+];
+
 /** demo: running as the demo site (demo/); the tab title gets a "· demo" suffix (in Chinese) */
 export function applyTheme(t = {}, { demo = false } = {}) {
   const r = document.documentElement;

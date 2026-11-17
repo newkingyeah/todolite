@@ -11,9 +11,8 @@ for (const font of [...css.matchAll(/url\("(fonts\/[^\"]+\.woff2)"\)/g)]) {
   const data = await readFile(`web/${font[1]}`);
   css = css.replace(font[0], `url("data:font/woff2;base64,${data.toString('base64')}")`);
 }
-const settingsCss = await readFile('plugin/settings.css', 'utf8');
 const script = frame.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
-const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style id="custom-css"></style></head><body><div id="root"></div><!--TODO_CONFIG--><script>if(window.TODO_PLUGIN.settings){const s=document.createElement('style');s.textContent=${JSON.stringify(settingsCss)};document.head.append(s)}</script><script>${script}</script></body></html>`;
+const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style id="custom-css"></style></head><body><div id="root"></div><!--TODO_CONFIG--><script>${script}</script></body></html>`;
 await writeFile('plugin/frame.html', html);
 await build({ entryPoints: ['plugin/main.js'], bundle: true, platform: 'node', format: 'cjs', external: ['obsidian'], loader: { '.html': 'text' }, outfile: 'main.js', target: 'es2020', minify: true });
 console.log('Built main.js (includes the board, settings and fonts).');
