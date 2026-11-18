@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { addGroup, addSection, updateGroup } from '../core/board.mjs';
+import { addGroup, addSection, deleteGroup, deleteSection, updateGroup } from '../core/board.mjs';
 import { getGroup, getItem, getSection, nowIso } from '../core/doc.mjs';
-import { addItem, checkItem, updateItem } from '../core/items.mjs';
+import { addItem, checkItem, deleteItem, updateItem } from '../core/items.mjs';
 import { closedAt } from '../web/lib/done.js';
 import { dueInfo, parseDue, ymd } from '../web/lib/due.js';
 import { ORDER, groupsOf } from '../web/lib/model.js';
@@ -29,7 +29,11 @@ const detailSchema = summarySchema.extend({
   agent: z.object({ name: nullableText, location: nullableText, progress: nullableText, result: nullableText,
     since: nullableText, last_seen: nullableText }).nullable(),
 });
+const sectionSchema = z.object({ section_id: z.string(), title: z.string(), hidden: z.boolean() });
 const cardSchema = z.object({ card_id: z.string(), title: z.string(), section_id: z.string(), section_title: z.string(), hidden: z.boolean() });
+const deletedContainerSchema = z.object({ title: z.string(), deleted_task_count: z.number().int().nonnegative() });
+const force = z.boolean().default(false).describe('明确要求连同其中的全部任务一起删除时设为 true');
+const destructiveWrite = { readOnly: false, destructive: true };
 const pendingHabitSchema = summarySchema.extend({ check_in_date: date, streak: z.number().int(), schedule: z.string() });
 const pageSchema = element => z.object({ items: z.array(element), total_count: z.number().int(), next_offset: z.number().int().nullable() });
 
@@ -70,10 +74,12 @@ function checkInDay(item, requested, done) {
 }
 
 export function registerTools(server, store) {
-  function tool(name, displayName, description, inputSchema, outputSchema, run, { readOnly = true, idempotent = true } = {}) {
+  function tool(name, displayName, description, inputSchema, outputSchema, run, {
+    readOnly = true, destructive = false, idempotent = true,
+  } = {}) {
     server.registerTool(`todolite_${name}`, {
       title: displayName, description, inputSchema: z.object(inputSchema).strict(), outputSchema,
-      annotations: { readOnlyHint: readOnly, destructiveHint: false, idempotentHint: idempotent, openWorldHint: false },
+      annotations: { readOnlyHint: readOnly, destructiveHint: destructive, idempotentHint: idempotent, openWorldHint: false },
     }, async args => {
       const data = await run(args);
       return { content: [{ type: 'text', text: JSON.stringify(data) }], structuredContent: data };
@@ -96,7 +102,13 @@ export function registerTools(server, store) {
       in_hand: page(focus.map(summary), limit, offset), pending_habits: page(pending, limit, offset) };
   });
 
-  tool('list_cards', '列出分区和卡片', '取得看板的分区和卡片 ID，供查任务、添加任务或移动任务使用。', {
+  tool('list_sections', '列出分区', '取得看板的分区 ID，包含没有卡片的分区。', { limit, offset },
+    pageSchema(sectionSchema), async ({ limit, offset }) => {
+      const doc = await store.read();
+      return page(doc.sections.map(section => ({ section_id: section.id, title: section.title, hidden: !!section.hidden })), limit, offset);
+    });
+
+  tool('list_cards', '列出分区和卡片', '取得看板的分区和卡片 ID，供查任务、添加、移动或删除内容时使用。', {
     section_id: id.optional(), limit, offset,
   }, pageSchema(cardSchema), async ({ section_id, limit, offset }) => {
     const doc = await store.read();
@@ -165,6 +177,20 @@ export function registerTools(server, store) {
     return { card: card(doc, getGroup(doc, groupId)) };
   }, { readOnly: false });
 
+  tool('delete_card', '删除卡片', '按 ID 删除卡片。卡片里有任务时，只有 force 为 true 才会连同任务一并删除。', {
+    card_id: id.describe('用 todolite_list_cards 获取卡片 ID'), force,
+  }, deletedContainerSchema.extend({ card_id: z.string() }), async ({ card_id, force }) => {
+    const { change } = await store.edit(draft => deleteGroup(draft, card_id, { force }));
+    return { card_id: change.id, title: change.title, deleted_task_count: change.items };
+  }, destructiveWrite);
+
+  tool('delete_section', '删除分区', '按 ID 删除分区及其中的卡片。分区里有任务时，只有 force 为 true 才会连同任务一并删除。', {
+    section_id: id.describe('用 todolite_list_sections 获取分区 ID'), force,
+  }, deletedContainerSchema.extend({ section_id: z.string() }), async ({ section_id, force }) => {
+    const { change } = await store.edit(draft => deleteSection(draft, section_id, { force }));
+    return { section_id: change.id, title: change.title, deleted_task_count: change.items };
+  }, destructiveWrite);
+
   tool('create_task', '添加待办或习惯', '在指定卡片添加任务。填写重复规则可创建习惯。请先用 list_cards 获取卡片 ID。', {
     card_id: id, title, note: note.optional(), due: due.optional().describe('日期、日期加时间或 AoE。null 表示无期限'),
     repeat: repeatInput.optional().describe('daily、weekdays、weekends，或 days（0 为周日）与可选刷新时间 time'),
@@ -192,6 +218,13 @@ export function registerTools(server, store) {
     });
     return { task: detail(getItem(doc, task_id)) };
   }, { readOnly: false });
+
+  tool('delete_task', '删除任务或习惯', '按 ID 删除一条任务，包含历史事项。删除习惯会一并删除它的打卡记录。', {
+    task_id: id.describe('用 todolite_search_tasks 获取任务 ID'),
+  }, z.object({ task_id: z.string(), title: z.string() }), async ({ task_id }) => {
+    const { change } = await store.edit(draft => deleteItem(draft, task_id));
+    return { task_id: change.id, title: change.title };
+  }, destructiveWrite);
 
   tool('assign_agent', '交接任务给 Agent', '记录 Agent 名称和运行位置，并把任务设为 Agent 在做。重新交接会开始新的进度记录。', {
     task_id: id, agent_name: title, location: title, progress: note.optional(),

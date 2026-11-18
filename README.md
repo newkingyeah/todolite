@@ -20,7 +20,7 @@
 
 ## Agent 接入（MCP）
 
-ToDo Lite 通过 MCP 提供 **10 个 Agent 可调用的工具**，每个工具都有明确的参数和返回格式。比如你说「在工作卡里加一条周五截止的待办」，Agent 会先用 `todolite_list_cards` 找到卡片 ID，再用 `todolite_create_task` 写入任务。工具还可以查今日任务和历史、修改、完成或重开任务、交接任务并回写进度与结果，以及打卡、补打和撤销。
+ToDo Lite 通过 MCP 提供 **14 个 Agent 可调用的工具**，每个工具都有明确的参数和返回格式。比如你说「在工作卡里加一条周五截止的待办」，Agent 会先用 `todolite_list_cards` 找到卡片 ID，再用 `todolite_create_task` 写入任务。工具还可以查今日任务和历史，修改、完成或重开任务，删除任务、卡片或分区，交接任务并回写进度与结果，以及打卡、补打和撤销。
 
 MCP 服务由客户端在本机通过 Node.js 启动，和 Obsidian 插件读写同一份看板数据。**Obsidian 关闭时，Agent 也能操作看板**，重新打开就能看到更新。
 

@@ -57,7 +57,7 @@ test('stdio MCP works without Obsidian, persists all four workflows and reconnec
   const { connect, data } = await useVault(t);
   const mcp = await connect();
   const { tools } = await mcp.client.listTools();
-  assert.equal(tools.length, 10);
+  assert.equal(tools.length, 14);
   assert.equal(tools.find(tool => tool.name === 'todolite_get_today').annotations.readOnlyHint, true);
   assert.equal(tools.find(tool => tool.name === 'todolite_create_task').annotations.idempotentHint, false);
   assert.deepEqual(await mcp.run('list_cards'), { items: [], total_count: 0, next_offset: null });
@@ -112,6 +112,57 @@ test('stdio MCP works without Obsidian, persists all four workflows and reconnec
   const reopened = await connect();
   assert.equal((await reopened.run('get_task', { task_id })).task.status, 'done');
   assert.deepEqual((await reopened.run('get_task', { task_id: habit.task_id })).task.check_ins, [check.date]);
+});
+
+test('MCP removes history and habits, and guards deletion of cards and sections that still contain tasks', async t => {
+  const { connect, data } = await useVault(t);
+  const mcp = await connect();
+  const { tools } = await mcp.client.listTools();
+  for (const name of ['delete_task', 'delete_card', 'delete_section']) {
+    const { annotations } = tools.find(tool => tool.name === `todolite_${name}`);
+    assert.equal(annotations.readOnlyHint, false);
+    assert.equal(annotations.destructiveHint, true);
+  }
+
+  const { card } = await mcp.run('create_card', { section_title: '临时分区', card_title: '临时卡片' });
+  const { card_id, section_id } = card;
+  const { task: history } = await mcp.run('create_task', { card_id, title: '已完成事项' });
+  await mcp.run('update_task', { task_id: history.task_id, status: 'done' });
+  assert.deepEqual(await mcp.run('delete_task', { task_id: history.task_id }), { task_id: history.task_id, title: history.title });
+  await mcp.fails('delete_task', { task_id: history.task_id }, /没有这一条/);
+  assert.equal((await mcp.run('search_tasks', { status: 'done' })).total_count, 0);
+
+  const { task: habit } = await mcp.run('create_task', { card_id, title: '习惯', repeat: 'daily' });
+  await mcp.run('check_habit', { task_id: habit.task_id });
+  await mcp.run('delete_task', { task_id: habit.task_id });
+  assert.equal((await mcp.run('search_tasks', { is_habit: true })).total_count, 0);
+
+  await mcp.run('create_task', { card_id, title: '随卡片删除' });
+  const { card: sibling } = await mcp.run('create_card', { section_id, card_title: '同分区另一卡' });
+  const { task: nested } = await mcp.run('create_task', { card_id: sibling.card_id, title: '随分区删除' });
+  const { card: other } = await mcp.run('create_card', { section_title: '其他分区', card_title: '保留卡片' });
+  const { task: keep } = await mcp.run('create_task', { card_id: other.card_id, title: '保留任务' });
+  const { store: desktop } = await openSharedBoard(data);
+
+  const before = await readFile(data, 'utf8');
+  await mcp.fails('delete_card', { card_id }, /还有 1 条/);
+  await mcp.fails('delete_section', { section_id }, /还有 2 条/);
+  assert.equal(await readFile(data, 'utf8'), before);
+
+  assert.equal((await mcp.run('delete_card', { card_id, force: true })).deleted_task_count, 1);
+  assert.equal((await mcp.run('get_task', { task_id: nested.task_id })).task.title, nested.title);
+  assert.equal((await mcp.run('delete_section', { section_id, force: true })).deleted_task_count, 1);
+
+  const { card: empty } = await mcp.run('create_card', { section_title: '空分区', card_title: '空分区' });
+  assert.equal((await mcp.run('delete_card', { card_id: empty.card_id })).deleted_task_count, 0);
+  assert.ok((await mcp.run('list_sections')).items.some(section => section.section_id === empty.section_id));
+  assert.equal((await mcp.run('delete_section', { section_id: empty.section_id })).deleted_task_count, 0);
+
+  await mcp.close();
+  const doc = await desktop.read();
+  assert.deepEqual(doc.items.map(item => item.id), [keep.task_id]);
+  assert.deepEqual(doc.groups.map(group => group.id), [other.card_id]);
+  assert.deepEqual(doc.sections.map(section => section.id), [other.section_id]);
 });
 
 test('desktop store and two MCP processes can write concurrently without losing changes', async t => {
