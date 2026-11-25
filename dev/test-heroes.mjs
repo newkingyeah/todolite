@@ -5,7 +5,7 @@
 //   node dev/test-heroes.mjs relay      only this one (the static checks still cover all of them)
 //
 // Checks:
-//   1. Static: every hero file exports meta (id, name, hint) and mount; the list matches the directory and ids are unique;
+//   1. Static: every active style exports meta (id, name, hint) and mount, is registered once, and has a unique ID;
 //      no text is drawn on the main canvas (ctx.fillText / ctx.strokeText).
 //   2. Each hero: sweep the mouse over it, click eight times in a row, move out; check the frame rate (at least three quarters
 //      of an empty page's), the time per frame, and errors.
@@ -24,13 +24,13 @@ const results = [];
 const check = (name, ok, detail = "") => { results.push({ name, ok, detail }); console.log(`${ok ? "PASS" : "FAIL"} ${name}${detail ? " — " + detail : ""}`); };
 
 /* ---------- 1. static checks ---------- */
-const files = fs.readdirSync(HEROES_DIR).filter((f) => f.endsWith(".js") && !["kit.js", "index.js"].includes(f));
 const indexSrc = fs.readFileSync(path.join(HEROES_DIR, "index.js"), "utf8");
-for (const f of files) {
-  const src = fs.readFileSync(path.join(HEROES_DIR, f), "utf8");
-  check(`${f} exports meta and mount`, /export const meta = \{/.test(src) && /export function mount\(canvas\)/.test(src));
-  check(`${f} draws no text on the main canvas`, !/\bctx\.(fillText|strokeText)\(/.test(src));
-  check(`${f} is registered in index.js`, indexSrc.includes(`from "./${f}"`));
+const files = [...indexSrc.matchAll(/^import \* as \w+ from "\.\/([^"]+\.js)";$/gm)].map((match) => match[1]);
+check("active styles are imported once", files.length > 0 && new Set(files).size === files.length);
+for (const file of files) {
+  const src = fs.readFileSync(path.join(HEROES_DIR, file), "utf8");
+  check(`${file} exports meta and mount`, /export const meta = \{/.test(src) && /export function mount\(canvas\)/.test(src));
+  check(`${file} draws no text on the main canvas`, !/\bctx\.(fillText|strokeText)\(/.test(src));
 }
 
 /* ---------- start the server and the browser ---------- */
@@ -54,7 +54,7 @@ console.log(`an empty page on this machine: ${cap} frames per second`);
 const ids = (await (async () => { const p = await tab(`${base}/dev/heroes.html?only=none`); const v = await p.ev(`import('/lib/heroes/index.js').then((m) => JSON.stringify(m.HEROES.map((h) => [h.id, h.name, h.hint, typeof h.mount])))`); await p.close(); return JSON.parse(v); })());
 check("ids in the list are unique", new Set(ids.map((x) => x[0])).size === ids.length, ids.map((x) => x[0]).join(", "));
 check("each has a name, a hint and mount", ids.every(([id, name, hint, m]) => id && name && hint && m === "function"));
-check("the list has as many entries as the directory has files", ids.length === files.length, `${ids.length} / ${files.length}`);
+check("the list matches the active imports", ids.length === files.length, `${ids.length} / ${files.length}`);
 
 /* ---------- 2, 3. each hero ---------- */
 for (const [id] of ids.filter(([id]) => !ONLY || id === ONLY)) {
@@ -98,15 +98,15 @@ if (!ONLY) {
     const shown = await p.ev(`[...document.querySelectorAll('.hero-picker .hp-item')].filter((b) => +getComputedStyle(b).opacity > 0.05).map((b) => b.textContent).join(' | ')`);
     const want = [ids[ids.length - 1][1], ids[0][1], ids[1][1]].join(" | ");
     check("shows the current one and one on each side, wrapping around", shown === want, shown);
-    // Four clicks while it slides (at uneven intervals, some landing just as a name slides into the frame): each one counts,
-    // and it saves only once when it stops
+    // Rapid clicks while it slides advance the target and save once when the slider settles.
     const s0 = await p.ev("window.__saves");
-    for (const gap of [60, 110, 160, 90]) { await right(); await sleep(gap); }
+    const steps = Math.min(4, ids.length - 1);
+    for (const gap of [60, 110, 160, 90].slice(0, steps)) { await right(); await sleep(gap); }
     await sleep(1200);
-    const s1 = await p.ev("window.__saves"), at4 = await style();
-    check("four clicks move four steps and save once", at4 === ids[4 % ids.length][0] && s1 - s0 === 1, `at ${at4}, saved ${s1 - s0} times`);
+    const s1 = await p.ev("window.__saves"), afterClicks = await style();
+    check("rapid clicks advance and save once", afterClicks === ids[steps][0] && s1 - s0 === 1, `at ${afterClicks}, saved ${s1 - s0} times`);
     await p.ev("document.querySelector('.hero-picker').focus()");
-    for (let k = 0; k < 4; k++) { await key("ArrowLeft"); await sleep(110); }
+    for (let k = 0; k < steps; k++) { await key("ArrowLeft"); await sleep(110); }
     await sleep(1200);
     check("arrow keys switch", (await style()) === "argus", await style());
     const seen = [];

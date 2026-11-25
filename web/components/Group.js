@@ -44,7 +44,7 @@ export function GroupCard({ group: g, single, no = 0 }) {
   const closed = mode === "all" ? allClosed : mode === "recent" ? recent : [];
   const history = mode === "recent" ? older : [];
   const historyIds = new Set(history.map((i) => i.id));
-  const editing = /^i:([^@]+)$/.exec(ui.editing ?? "")?.[1];
+  const editing = window.TODO_PLUGIN ? undefined : /^i:([^@]+)$/.exec(ui.editing ?? "")?.[1];
   const editingHistory = historyIds.has(editing);
   const locatedHistory = historyIds.has(ui.locate?.id) ? ui.locate.n : 0;
   useLayoutEffect(() => {
@@ -127,7 +127,7 @@ export function GroupCard({ group: g, single, no = 0 }) {
     ${g.note ? html`<p class="desc"><${Md} text=${g.note} /></p>` : null}
     ${shown.length ? html`<div class=${`items ${showTitle || g.note ? "" : "flush"}`} ref=${listRef}>${rows.map(({ x: i, enter, leave }) => html`<${ItemRow} key=${i.id} item=${i} exiting=${lingering.includes(i)} enter=${enter} leave=${leave} />`)}</div>`
       : html`<div class="none">${all.length ? "都做完了。" : "还没有事。"}</div>`}
-    <${AddInline} id=${`i:${g.id}`} keep label="＋ 添加" placeholder="要做的事" onSubmit=${(title) => act.addItem({ group: g.id, title })} />
+    ${!window.TODO_PLUGIN ? html`<${AddInline} id=${`i:${g.id}`} keep label="＋ 添加" placeholder="要做的事" onSubmit=${(title) => act.addItem({ group: g.id, title })} />` : null}
     ${history.length ? html`
       <button type="button" class="closed-more" aria-expanded=${expanded} aria-controls=${historyId} onClick=${() => {
         if (expanded) setPop(null);

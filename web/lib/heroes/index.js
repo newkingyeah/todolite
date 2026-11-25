@@ -5,18 +5,12 @@
 // one only touches the two places here.
 // See README.md in this directory for how to write one and the rules to follow.
 import * as argus from "./argus.js";
-import * as relay from "./relay.js";
-import * as flow from "./flow.js";
-import * as ripple from "./ripple.js";
-import * as scan from "./scan.js";
-import * as cloth from "./cloth.js";
-import * as landscape from "./landscape.js";
-import * as lidar from "./lidar.js";
-import * as filings from "./filings.js";
-import * as growth from "./growth.js";
-import * as blackhole from "./blackhole.js";
+import * as quietGaze from "./quiet-gaze.js";
+import * as orrery from "./orrery.js";
+import * as slopeField from "./slope-field.js";
+import * as murmuration from "./murmuration.js";
 
-const MODULES = [argus, relay, flow, ripple, scan, cloth, landscape, lidar, filings, growth, blackhole];
+const MODULES = [argus, quietGaze, orrery, slopeField, murmuration];
 
 export const HEROES = MODULES.map((m) => ({ ...m.meta, mount: m.mount }));
 export const heroById = (id) => HEROES.find((h) => h.id === id) ?? HEROES[0];

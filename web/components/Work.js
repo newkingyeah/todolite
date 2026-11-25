@@ -41,12 +41,12 @@ export function TodayBlock() {
   ].filter(Boolean).join(" · ");
 
   const grid = useSlide(doc.theme);
-  const side = html`<h2>今日工作</h2>${ui.editMode ? html`<${Seg} k="agentCols" cur=${cols} opts=${[[1, "一列"], [2, "两列"], [3, "三列"]]} />` : null}`;
+  const side = html`<h2>今日工作</h2>${ui.editMode && !window.TODO_PLUGIN ? html`<${Seg} k="agentCols" cur=${cols} opts=${[[1, "一列"], [2, "两列"], [3, "三列"]]} />` : null}`;
   return html`<${Block} id="b-today" toc="今日工作" side=${side}>
     <div class="today-head"><span class="ttl">${head}</span><span class="sum">${tally || "今天没有到期的事，也没有在手的。"}</span></div>
     ${list.length
       ? html`<div class="agent-wrap"><div class=${`agent-grid cols-${cols}`} ref=${grid}>${list.map(({ i, info }) => html`<${WorkCard} key=${i.id} item=${i} info=${info} />`)}</div></div>`
-      : html`<div class="card"><div class="none" style="padding:0">今天没有要弄的事。</div></div>`}
+      : html`<div class="card"><div class="none" style="padding:0">${window.TODO_PLUGIN ? "Nothing" : "今天没有要弄的事。"}</div></div>`}
     ${habits.length ? html`<div class="card">
       <h3>打卡<span class="count">${left ? `今天还剩 ${left} 个没打` : "今天都打完了"}</span></h3>
       <${HabitTable} items=${habits} />
@@ -135,7 +135,7 @@ async function checked(card, x, y, { doc, tweak, reload, act }, id) {
 function WorkCard({ item: i, info }) {
   const { doc, ui } = useBoard();
   const key = isAgent(i) ? `i:${i.id}@agent` : `i:${i.id}`;
-  if (ui.editing === key) return html`<div class="card wide"><${ItemForm} item=${i} /></div>`;
+  if (!window.TODO_PLUGIN && ui.editing === key) return html`<div class="card wide"><${ItemForm} item=${i} /></div>`;
   return agentCardOf(doc.theme) === "buttons" ? html`<${ButtonsCard} item=${i} info=${info} />` : html`<${GestureCard} item=${i} info=${info} />`;
 }
 
@@ -170,8 +170,10 @@ function ButtonsCard({ item: i, info }) {
     <div class="row">
       ${isAgent(i) ? html`<button class="btn dark" onClick=${(e) => { const b = e.currentTarget.getBoundingClientRect(); checked(ref.current, b.left + b.width / 2, b.top + b.height / 2, board, i.id); }}>看过了</button>` : null}
       <button class="btn ${isAgent(i) ? "" : "dark"}" onClick=${(e) => finish(ref.current, e.currentTarget, doc, it, st)}>${st ? "✓ 今天做完了" : "✓ 做完了"}</button>
-      ${i.status !== "doing" ? html`<button class="btn b-back" onClick=${() => it.patch({ status: "doing" })}>${i.status === "todo" ? "开始做" : "收回来自己做"}</button>` : null}
-      <button class="btn b-edit" onClick=${() => setUi({ editing: key, adding: null })}>编辑</button>
+      ${!window.TODO_PLUGIN ? html`
+        ${i.status !== "doing" ? html`<button class="btn b-back" onClick=${() => it.patch({ status: "doing" })}>${i.status === "todo" ? "开始做" : "收回来自己做"}</button>` : null}
+        <button class="btn b-edit" onClick=${() => setUi({ editing: key, adding: null })}>编辑</button>
+      ` : null}
       <button class="btn b-more" title="更多" data-pop-anchor onClick=${(e) => openPop("status", i.id, e.currentTarget, { from: isAgent(i) ? "agent" : undefined })}>⋯</button>
     </div>
   </div>`;
@@ -190,8 +192,10 @@ function GestureCard({ item: i, info }) {
     <div class="ag-head"><h3><${Md} text=${i.title} /></h3>
       <span class="ag-tools">
         <button class="rnd t-locate" title="定位" onClick=${() => locate(i.id)}><${LocateIcon} /></button>
-        ${i.status !== "doing" ? html`<button class="rnd t-back" title=${i.status === "todo" ? "开始做" : "收回来自己做"} onClick=${() => it.patch({ status: "doing" })}>${i.status === "todo" ? html`<${StatusIcon} s="doing" />` : html`<${BackIcon} />`}</button>` : null}
-        <button class="rnd t-edit" title="编辑" onClick=${() => setUi({ editing: key, adding: null })}><${EditIcon} /></button>
+        ${!window.TODO_PLUGIN ? html`
+          ${i.status !== "doing" ? html`<button class="rnd t-back" title=${i.status === "todo" ? "开始做" : "收回来自己做"} onClick=${() => it.patch({ status: "doing" })}>${i.status === "todo" ? html`<${StatusIcon} s="doing" />` : html`<${BackIcon} />`}</button>` : null}
+          <button class="rnd t-edit" title="编辑" onClick=${() => setUi({ editing: key, adding: null })}><${EditIcon} /></button>
+        ` : null}
       </span>
     </div>
     <${Body} i=${i} info=${info} g=${g} stale=${doc.settings?.staleHours ?? 3} />

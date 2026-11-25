@@ -20,7 +20,7 @@ export const DEFAULT_THEME = {
   showToday: true,         // today's work and habit table
   showRepeat: true,        // check-in block (recurring items)
   hero: true,              // header animation
-  heroStyle: "landscape",      // which header animation; the list is in web/lib/heroes/index.js
+  heroStyle: "argus",      // which header animation; the list is in web/lib/heroes/index.js
   heroHeight: 220,
   agentCols: 2,            // columns in the today-work block: 1 / 2 / 3
   agentCard: "gesture",    // agent cards: gesture (tilt on hover, double-click for checked, slide or hold for done, round icons) / buttons (the older layout)

@@ -1,19 +1,21 @@
-# ToDo Lite · Obsidian 插件
+# AI Based ToDo Lite
 
-**ToDo Lite** 是一个 Obsidian 待办插件，可以在笔记库里管理任务、查看截止日期和记录习惯打卡。
+**AI Based ToDo Lite** 是一个 Obsidian 桌面待办插件。它把今日任务、日历、打卡和项目分区放在同一个看板里，并可通过 MCP 交接任务和记录 Agent 进度。
 
 - 看板按 **今日工作 → 日历 → 分区** 排列。点击顶部的 **编辑布局** 可以新增和调整分区、卡片。
-- 设置统一放在 **Obsidian → 设置 → ToDo Lite**，修改后立即保存并更新看板。
+- 设置统一放在 **Obsidian → 设置 → AI Based ToDo Lite**，修改后立即保存并更新看板。
 - 首次启用是空看板，不含演示任务，不读取原工程的 SQLite 数据。
 - 插件可直接使用。任务、打卡、布局和外观设置保存在当前笔记库的 `.obsidian/plugins/todo-lite/data.json`。
-- 支持任务状态、截止日期、重复打卡、今日工作和月历；保留原来的头图与特效。
+- 支持任务状态、截止日期、重复打卡、今日工作和月历。头图可选网眼、暗处回望、三维天体仪、斜率场和鸟群。
+- 看板可上下调整任务顺序，切换「还没做、做完了、不做了、等别人」。新增任务或修改标题、备注和截止日期可用 MCP。
+- 鼠标悬停在排满任务的日期格上，可以查看当天的完整清单。
 
 ## 安装
 
-1. 从本仓库下载 [main.js](main.js)、[manifest.json](manifest.json) 和 [styles.css](styles.css)。
+1. 从 [GitHub Releases](https://github.com/newkingyeah/todolite/releases) 下载 main.js、manifest.json 和 styles.css。需要 Obsidian 1.15.1 或更高版本的桌面应用。
 2. 在笔记库内创建 `.obsidian/plugins/todo-lite/`，把三个文件放入这个目录。
-3. 在 Obsidian 的第三方插件设置中启用 **ToDo Lite**。
-4. 点击左侧待办图标，或用命令面板执行 **ToDo Lite: 打开看板**。
+3. 在 Obsidian 的第三方插件设置中启用 **AI Based ToDo Lite**。
+4. 点击左侧待办图标，或用命令面板执行 **AI Based ToDo Lite: 打开看板**。
 5. 点击 **编辑布局 → ＋ 加一块新的分区**，开始建立自己的看板。
 
 升级时只替换以上三个文件，保留 `data.json`。首次安装不需要创建 `data.json`。
@@ -32,7 +34,7 @@ MCP 服务由客户端在本机通过 Node.js 启动，和 Obsidian 插件读写
 请帮我在本机安装 ToDo Lite Obsidian 插件，并在当前 Agent 客户端配置 todolite MCP。请直接完成安装和验证。
 
 1. 从 https://github.com/newkingyeah/todolite 下载完整仓库到固定的本地目录。准备 Node.js 22.13 或更高版本，在仓库目录执行 npm ci。
-2. 确认我要使用的 Obsidian 笔记库。能从本机配置确定就直接使用，无法确定时再问我。把仓库根目录的 main.js、manifest.json、styles.css 放到该库配置目录下的 plugins/todo-lite/，通常是 .obsidian/plugins/todo-lite/。启用 ToDo Lite，升级时保留已有 data.json。如果旧版插件正在运行，请重载插件。
+2. 确认我要使用的 Obsidian 笔记库。能从本机配置确定就直接使用，无法确定时再问我。把仓库根目录的 main.js、manifest.json、styles.css 放到该库配置目录下的 plugins/todo-lite/，通常是 .obsidian/plugins/todo-lite/。启用 AI Based ToDo Lite，升级时保留已有 data.json。如果旧版插件正在运行，请重载插件。
 3. 在当前客户端添加名为 todolite 的本地 stdio MCP 服务。用 Node.js 启动仓库中的 mcp/server.mjs，传入 --vault 和笔记库的绝对路径。脚本也使用绝对路径。若使用自定义 Obsidian 配置目录，再传 --config-dir 和该目录在笔记库内的相对路径。
 4. 通过 MCP 调用 todolite_list_cards 做只读连通验证。如果当前客户端需要重启才能加载配置，先验证本地服务能连接，再告诉我如何让配置生效。最后报告笔记库、插件版本和验证结果。
 ```
@@ -41,11 +43,17 @@ MCP 服务由客户端在本机通过 Node.js 启动，和 Obsidian 插件读写
 
 ## 设置
 
-打开 **设置 → ToDo Lite**。设置使用 Obsidian 原生控件，可调整看板外观、布局、头图、动效、Agent 运行位置和分区。标题等文本按回车或离开输入框时保存。自定义 CSS 通过 **保存 CSS** 生效。
+打开 **设置 → AI Based ToDo Lite**。设置使用 Obsidian 原生控件，可调整看板外观、显示内容、头图和动效。桌面看板采用宽松密度、左侧分区标题和今日工作三列。标题等文本按回车或离开输入框时保存。自定义 CSS 通过 **保存 CSS** 生效。
 
 设置页始终跟随 Obsidian 的主题。看板可独立选择浅色、深色或跟随 Obsidian。
 
 Canvas LMS 的服务端同步不在插件内运行；原服务端工具仍保留，使用方式见 [原网页服务文档](docs/server.md)。
+
+## 数据与权限
+
+插件在笔记库内读写本地看板数据。桌面端在系统临时目录使用文件锁，让 Obsidian 和可选的本机 MCP 进程并发写入时保持数据一致。
+
+插件核心功能可离线使用。MCP 通过本机标准输入输出连接你的 Agent 客户端，客户端可以读取或修改指定看板中的任务。任务会交给你选择的客户端处理，由该客户端的数据处理设置决定后续流向。笔记中的外部链接由用户主动打开。
 
 ## 开发与测试
 
@@ -75,4 +83,4 @@ npm run package
 
 ## 许可证
 
-[MIT](LICENSE)。基于 [Axi404/todo](https://github.com/Axi404/todo) 的 todo-lite 版本改造，保留原作者版权声明。Preact、htm 与字体的许可证随源代码保留。
+[MIT](LICENSE)。原项目作者与贡献者 Axi404，项目源自 [Axi404/todo](https://github.com/Axi404/todo)，由 [newkingyeah](https://github.com/newkingyeah) 维护当前 Obsidian 版本。Preact、htm、字体和其他第三方依赖的许可证随源代码和发布版保留。

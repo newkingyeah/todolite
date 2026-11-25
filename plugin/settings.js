@@ -4,11 +4,8 @@ import { closedModeOf, recentDaysOf } from '../web/lib/done.js';
 import { fxOf, fxOptions } from '../web/lib/fx/index.js';
 import { seenFxOf, seenFxOptions } from '../web/lib/fx/seen.js';
 import { HEROES, heroById } from '../web/lib/heroes/index.js';
-import { sections } from '../web/lib/model.js';
 import { MOVES, moveOf } from '../web/lib/motion.js';
-import { placesByRecency } from '../web/lib/places.js';
-import { ACCENT_OPTIONS, agentCardOf, agentColsOf, agentDoneOf } from '../web/lib/theme.js';
-import { ago } from '../web/lib/time.js';
+import { ACCENT_OPTIONS, agentCardOf, agentDoneOf } from '../web/lib/theme.js';
 
 function onEnter(input, commit) {
   input.addEventListener('keydown', event => {
@@ -49,8 +46,6 @@ export class TodoSettingsTab extends PluginSettingTab {
     this.appearance(panel);
     this.board(panel);
     this.effects(panel);
-    this.places(panel);
-    this.sections(panel);
     this.customStyle(panel);
   }
 
@@ -99,11 +94,11 @@ export class TodoSettingsTab extends PluginSettingTab {
     });
   }
 
-  slider(panel, name, key, limits, suffix, scope = 'theme') {
+  slider(panel, name, key, limits, suffix) {
     return new Setting(panel).setName(name).addSlider(slider => {
       slider.setLimits(...limits).setDynamicTooltip();
       slider.setDisplayFormat?.(value => `${value}${suffix}`);
-      this.bind(slider, slider.sliderEl, name, doc => doc[scope][key], value => this.act[scope]({ [key]: value }));
+      this.bind(slider, slider.sliderEl, name, doc => doc.theme[key], value => this.act.theme({ [key]: value }));
     });
   }
 
@@ -155,9 +150,6 @@ export class TodoSettingsTab extends PluginSettingTab {
 
   board(panel) {
     new Setting(panel).setName('看板与显示').setHeading();
-    this.select(panel, '内容密度', 'density', [['comfortable', '宽松'], ['compact', '紧凑']]);
-    this.select(panel, '分区排版', 'layout', [['sidebar', '标题在左'], ['stacked', '标题在上']]);
-    this.select(panel, '今日工作列数', 'agentCols', [[1, '一列'], [2, '两列'], [3, '三列']], agentColsOf);
     this.select(panel, '今日工作卡片', 'agentCard', [['gesture', '手势'], ['buttons', '按钮']], agentCardOf);
     const done = this.select(panel, '标记完成的手势', 'agentDone', [['slide', '滑动'], ['hold', '长按']], agentDoneOf);
     this.observe(doc => agentCardOf(doc.theme), mode => { done.settingEl.hidden = mode !== 'gesture'; });
@@ -177,7 +169,7 @@ export class TodoSettingsTab extends PluginSettingTab {
   effects(panel) {
     new Setting(panel).setName('动效').setHeading();
     const effects = [
-      ['Agent 完成任务', 'agentFx', fxOptions('agent'), theme => fxOf(theme, 'agent'), 'agent'],
+      ['完整任务', 'agentFx', fxOptions('agent'), theme => fxOf(theme, 'agent'), 'agent'],
       ['打卡完成', 'checkFx', fxOptions('check'), theme => fxOf(theme, 'check'), 'check'],
       ['标记已查看', 'seenFx', seenFxOptions(), seenFxOf, 'seen'],
       ['已查看卡片移动', 'agentMove', MOVES, moveOf, 'move'],
@@ -205,52 +197,6 @@ export class TodoSettingsTab extends PluginSettingTab {
     this.preview.scrollIntoView({ block: 'nearest' });
   }
 
-  places(panel) {
-    new Setting(panel).setName('Agent').setHeading();
-    this.slider(panel, '多久未查看算超时', 'staleHours', [1, 24, 1], ' 小时', 'settings');
-    const list = panel.createDiv();
-    this.observe(doc => JSON.stringify(placesByRecency(doc)), () => {
-      list.empty();
-      for (const place of placesByRecency(this.store.doc)) {
-        const lastUse = place.lastUsed ? `，上次使用 ${ago(place.lastUsed)}` : '';
-        new Setting(list).setName(place.name).setDesc(`使用 ${place.uses} 次${lastUse}`)
-          .addButton(button => button.setButtonText('重命名').onClick(() => this.renamePlace(place.name)))
-          .addButton(button => button.setButtonText('移除').onClick(() => this.act.places.remove(place.name)));
-      }
-    });
-    let input;
-    const add = async () => {
-      const name = input.value.trim();
-      if (name && await this.act.places.add(name) && input.value.trim() === name) input.value = '';
-    };
-    new Setting(panel).setName('添加运行位置')
-      .addText(text => {
-        input = text.setPlaceholder('例如 本机').inputEl;
-        input.setAttribute('aria-label', '新运行位置');
-        onEnter(input, add);
-      })
-      .addButton(button => button.setButtonText('添加').onClick(add));
-  }
-
-  renamePlace(from) {
-    const dialog = this.openDialog('重命名运行位置');
-    let input;
-    const rename = async () => {
-      const name = input.value.trim();
-      if (name && await this.act.places.rename(from, name)) dialog.close();
-    };
-    new Setting(dialog.contentEl).setName('位置名称').addText(text => {
-      input = text.setValue(from).inputEl;
-      input.setAttribute('aria-label', '位置名称');
-      onEnter(input, rename);
-    });
-    new Setting(dialog.contentEl)
-      .addButton(button => button.setButtonText('取消').onClick(() => dialog.close()))
-      .addButton(button => button.setButtonText('重命名').setCta().onClick(rename));
-    dialog.open();
-    input.select();
-  }
-
   openDialog(title) {
     this.dialog?.close();
     const dialog = new Modal(this.app).setTitle(title);
@@ -260,37 +206,6 @@ export class TodoSettingsTab extends PluginSettingTab {
     };
     this.dialog = dialog;
     return dialog;
-  }
-
-  sections(panel) {
-    new Setting(panel).setName('分区').setHeading();
-    const list = panel.createDiv();
-    const sectionList = doc => sections(doc).map(({ id, title, hidden }) => ({ id, title, hidden }));
-    this.observe(doc => JSON.stringify(sectionList(doc)), snapshot => {
-      const focusKey = list.ownerDocument.activeElement?.dataset?.todoSectionControl;
-      list.empty();
-      const entries = JSON.parse(snapshot);
-      if (!entries.length) new Setting(list).setDesc('在看板的「编辑布局」里添加分区。');
-      for (const [index, section] of entries.entries()) {
-        const { id, title, hidden } = section;
-        new Setting(list).setName(title).addToggle(toggle => {
-          toggle.toggleEl.setAttribute('aria-label', `显示分区 ${title}`);
-          toggle.toggleEl.dataset.todoSectionControl = `${id}:visible`;
-          toggle.setValue(!hidden).onChange(async visible => {
-            if (!await this.act.section(id).patch({ hidden: !visible })) toggle.setValue(!hidden);
-          });
-        }).addButton(button => {
-          button.setIcon('arrow-up').setTooltip('上移').setDisabled(index === 0).onClick(() => this.act.section(id).move('up'));
-          button.buttonEl.setAttribute('aria-label', `上移分区 ${title}`);
-          button.buttonEl.dataset.todoSectionControl = `${id}:up`;
-        }).addButton(button => {
-          button.setIcon('arrow-down').setTooltip('下移').setDisabled(index === entries.length - 1).onClick(() => this.act.section(id).move('down'));
-          button.buttonEl.setAttribute('aria-label', `下移分区 ${title}`);
-          button.buttonEl.dataset.todoSectionControl = `${id}:down`;
-        });
-      }
-      if (focusKey) list.querySelector(`[data-todo-section-control="${CSS.escape(focusKey)}"]`)?.focus({ preventScroll: true });
-    });
   }
 
   customStyle(panel) {

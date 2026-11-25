@@ -56,6 +56,8 @@ with sync_playwright() as p:
         expect(board.get_by_role('button', name='编辑布局', exact=True)).to_be_visible()
         assert page.evaluate("app.plugins.getPlugin('todo-lite').store.doc.items.length") == 0
         assert page.evaluate("app.plugins.getPlugin('todo-lite').store.doc.sections.length") == 0
+        expect(board.locator('#b-today .sum')).to_have_text('今天没有到期的事，也没有在手的。')
+        expect(board.locator('#b-today .none')).to_have_text('Nothing')
         passed('empty first launch; only Edit layout in the board toolbar')
 
         board.get_by_role('button', name='编辑布局', exact=True).click()
@@ -67,33 +69,32 @@ with sync_playwright() as p:
         labels = board.locator('main > .container > section').evaluate_all('(blocks) => blocks.map(block => block.dataset.toc)')
         assert labels == ['今日工作', '日历', '验收分区'], labels
         passed('today, calendar and sections render in that order')
-        board.get_by_role('button', name='＋ 添加', exact=True).click()
-        board.get_by_placeholder('要做的事').fill('待办验收')
-        board.get_by_placeholder('要做的事').press('Enter')
+        page.evaluate('''async () => {
+          const store = app.plugins.getPlugin('todo-lite').store;
+          const group = store.doc.groups[0].id;
+          await store.request('POST', '/api/items', {group, title: '待办验收', note: '保存备注', due: '2026-11-20'});
+          await store.request('POST', '/api/items', {group, title: '每日打卡验收', repeat: {days: [0,1,2,3,4,5,6]}});
+        }''')
+        expect(board.get_by_role('button', name='＋ 添加', exact=True)).to_have_count(0)
         row = board.locator('.items .item').filter(has=board.locator('.t', has_text='待办验收'))
-        expect(row).to_have_count(1)
-        row.hover()
-        row.get_by_title('编辑', exact=True).click()
-        board.get_by_placeholder('要做的事').fill('编辑后的待办')
-        board.get_by_placeholder('备注', exact=True).fill('保存备注')
-        board.get_by_placeholder('截止：无', exact=True).fill('2026-11-20')
-        board.get_by_role('button', name='保存', exact=True).click()
-        row = board.locator('.items .item').filter(has=board.locator('.t', has_text='编辑后的待办'))
         expect(row).to_contain_text('保存备注')
+        row.hover()
+        assert row.locator('.tools button').evaluate_all("buttons => buttons.map(button => button.title)") == ['上移', '下移']
+        row.get_by_title('下移', exact=True).click()
+        expect(board.locator('.items .item .t').first).to_have_text('每日打卡验收')
+        row.hover()
+        row.get_by_title('上移', exact=True).click()
+        expect(board.locator('.items .item .t').first).to_have_text('待办验收')
         row.locator('button.pill').click()
+        choices = board.locator('.pop .opt')
+        expect(choices).to_have_count(4)
+        assert choices.evaluate_all("buttons => buttons.map(button => button.className)") == ['opt s-todo', 'opt s-done', 'opt s-dropped', 'opt s-waiting']
         board.locator('.pop .opt').filter(has_text='做完了').click()
         expect(row).to_have_class(re.compile(r'\bdone\b'))
-        passed('create section and task; edit title, note, due date; complete task')
+        passed('only up/down row controls and four task statuses; move and complete a task')
 
-        board.get_by_role('button', name='＋ 添加', exact=True).click()
-        board.get_by_placeholder('要做的事').fill('每日打卡验收')
-        board.get_by_placeholder('要做的事').press('Enter')
         habit = board.locator('.items .item').filter(has=board.locator('.t', has_text='每日打卡验收'))
         expect(habit).to_have_count(1)
-        habit.locator('button.pill').click()
-        board.locator('.pop .opt').filter(has_text='设为重复').click()
-        board.get_by_role('button', name='每天', exact=True).click()
-        board.locator('.pop').get_by_role('button', name='完成', exact=True).click()
         expect(habit.locator('.pill')).to_have_attribute('aria-label', '今天要做')
         habit.locator('.pill').click()
         expect(habit.locator('.pill')).to_have_attribute('aria-label', '今天做完')
@@ -102,7 +103,7 @@ with sync_playwright() as p:
         habit.locator('.pill').click()
         expect(habit.locator('.pill')).to_have_attribute('aria-label', '今天做完')
         expect(board.locator('.hab .nm').filter(has_text='每日打卡验收')).to_have_count(1)
-        passed('configure daily habit; check in, undo and check in again')
+        passed('daily habit check-in, undo and check-in again')
 
         # Backdate fixtures in the disposable vault to exercise a long list and calendar navigation.
         page.evaluate('''async () => {
@@ -128,7 +129,7 @@ with sync_playwright() as p:
         }''')
         history_button = board.get_by_role('button', name='历史记录 12 条', exact=True)
         history_panel = board.locator('.history-window')
-        expect(board.locator('.add + .closed-more')).to_have_text('历史记录 12 条')
+        expect(board.locator('.closed-more')).to_have_text('历史记录 12 条')
         expect(history_button).to_have_attribute('aria-expanded', 'false')
         expect(history_panel).to_be_hidden()
         history_button.click()
@@ -148,24 +149,15 @@ with sync_playwright() as p:
         history_button.click()
         expect(history_button).to_have_attribute('aria-expanded', 'false')
         expect(history_panel).to_be_hidden()
-        passed('history keeps the same button below Add and scrolls independently of the board')
+        passed('completed history collapses and scrolls independently of the board')
 
         board.locator('#b-calendar').get_by_role('button', name='历史测试事项 12', exact=True).click()
         expect(history_button).to_have_attribute('aria-expanded', 'true')
         old_task = history_panel.locator('[data-id="history-fixture-12"].item')
         expect(old_task).to_have_class(re.compile(r'\blocated2?\b'))
-        old_task.hover()
-        old_task.get_by_title('编辑', exact=True).click()
-        draft_title = history_panel.get_by_placeholder('要做的事')
-        draft_title.fill('保留的历史草稿')
         history_button.click()
         expect(history_panel).to_be_hidden()
-        history_button.click()
-        expect(draft_title).to_have_value('保留的历史草稿')
-        history_panel.get_by_role('button', name='取消', exact=True).click()
-        history_button.click()
-        expect(history_panel).to_be_hidden()
-        passed('calendar opens and locates an older task, and hiding the panel preserves its edit draft')
+        passed('calendar opens completed history and locates an older task')
 
         # Obsidian 1.14 opens Settings in a separate window; older versions use a modal.
         page.evaluate("() => { app.setting.open(); app.setting.openTabById('todo-lite'); }")
@@ -206,29 +198,14 @@ with sync_playwright() as p:
         font.select_option('default')
         expect(custom_font).to_be_hidden()
 
-        section = settings.get_by_label('显示分区 验收分区', exact=True)
-        section.click()
-        expect(board.get_by_role('heading', name='验收分区', exact=True)).to_have_count(0)
-        section.click()
-        expect(board.get_by_role('heading', name='验收分区', exact=True)).to_be_visible()
+        for name in ['Agent', '分区', '内容密度', '分区排版', '今日工作列数']:
+            expect(settings.get_by_text(name, exact=True)).to_have_count(0)
+        expect(settings.get_by_label('完整任务', exact=True)).to_be_visible()
+        passed('custom font works and native settings show the simplified layout')
 
-        location = settings.get_by_label('新运行位置', exact=True)
-        location.fill('临时 Agent')
-        location.press('Enter')
-        expect(settings.get_by_text('临时 Agent', exact=True)).to_be_visible()
-        settings.get_by_role('button', name='重命名', exact=True).click()
-        rename_page = page_with('.modal input[aria-label="位置名称"]')
-        renamed = rename_page.get_by_label('位置名称', exact=True)
-        renamed.fill('新位置')
-        renamed.press('Enter')
-        expect(settings.get_by_text('新位置', exact=True)).to_be_visible()
-        settings.get_by_role('button', name='移除', exact=True).click()
-        expect(settings.get_by_text('新位置', exact=True)).to_have_count(0)
-        passed('custom font, section visibility and Agent location management work in native settings')
-
-        settings.get_by_role('button', name='预览打卡完成').click()
+        settings.get_by_role('button', name='预览完整任务', exact=True).click()
         preview = settings.frame_locator('iframe[title="动效示例"]')
-        expect(preview.locator('.card')).to_be_visible()
+        expect(preview.locator('#root > .card')).to_be_visible()
         settings.get_by_role('button', name='收起', exact=True).click()
         expect(settings.locator('iframe')).to_have_count(0)
 
@@ -295,7 +272,7 @@ with sync_playwright() as p:
         }''')
         board = page.frame_locator('iframe.todo-lite-board-frame')
         expect(board.locator('header .brand')).to_have_text('验收看板')
-        expect(board.locator('.items .item.done').filter(has_text='编辑后的待办')).to_have_count(1)
+        expect(board.locator('.items .item.done').filter(has_text='待办验收')).to_have_count(1)
         expect(board.locator('.items .item .pill[aria-label="今天做完"]')).to_have_count(1)
         expect(board.get_by_role('button', name='历史记录 12 条', exact=True)).to_have_attribute('aria-expanded', 'false')
         page.screenshot(path=str(shots / 'board.png'))

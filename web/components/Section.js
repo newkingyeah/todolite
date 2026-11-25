@@ -29,7 +29,7 @@ export function SectionBlock({ section: s }) {
   const gs = groupsOf(doc, s.id), sec = act.section(s.id);
   const tools = ui.editMode ? html`<div class="tools" style="visibility:visible">
     <${MoveTools} onMove=${sec.move} />
-    <button class="tool" title="改名字" onClick=${() => setUi({ editing: `s:${s.id}`, adding: null })}>✎</button>
+    ${!window.TODO_PLUGIN ? html`<button class="tool" title="改名字" onClick=${() => setUi({ editing: `s:${s.id}`, adding: null })}>✎</button>` : null}
     <button class="tool" title=${s.hidden ? "重新显示" : "隐藏这一块"} onClick=${() => sec.patch({ hidden: !s.hidden }, s.hidden ? "又显示出来了" : "隐藏了")}>${s.hidden ? "显示" : "隐藏"}</button>
   </div>` : null;
   // While the section is being edited, the form takes the place of the cards on the right, as wide as the card and item

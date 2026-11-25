@@ -14,10 +14,20 @@ for (const font of [...css.matchAll(/url\("(fonts\/[^\"]+\.woff2)"\)/g)]) {
 const script = frame.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style id="custom-css"></style></head><body><div id="root"></div><!--TODO_CONFIG--><script>${script}</script></body></html>`;
 await writeFile('plugin/frame.html', html);
-const notices = await Promise.all(['proper-lockfile/LICENSE', 'graceful-fs/LICENSE.md', 'retry/License', 'signal-exit/LICENSE.txt'].map(async file => {
-  const license = await readFile(`node_modules/${file}`, 'utf8');
-  return `${file.split('/')[0]}\n${license.trim()}`;
-}));
+const licenseFiles = [
+  "LICENSE",
+  "web/vendor/LICENSE-preact",
+  "web/vendor/LICENSE-htm",
+  "web/fonts/GUST-FONT-LICENSE.txt",
+  "web/fonts/LPPL-1.3c.txt",
+  "node_modules/proper-lockfile/LICENSE",
+  "node_modules/graceful-fs/LICENSE.md",
+  "node_modules/retry/License",
+  "node_modules/signal-exit/LICENSE.txt"
+];
+const notices = await Promise.all(licenseFiles.map(async file =>
+  file + "\n" + (await readFile(file, "utf8")).trim()
+));
 await build({
   entryPoints: ['plugin/main.js'], bundle: true, platform: 'node', format: 'cjs', external: ['obsidian'],
   loader: { '.html': 'text' }, outfile: 'main.js', target: 'es2020', minify: true,

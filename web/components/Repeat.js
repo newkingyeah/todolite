@@ -83,7 +83,12 @@ export function RepeatBadge({ item: i }) {
   const { openPop } = useBoard();
   const st = repeatState(i);
   if (!st) return null;
-  const label = html`<span class="rep" data-pop-anchor title="改重复" onClick=${(e) => openPop("repeat", i.id, e.currentTarget)}>↻ ${st.label}</span>`;
+  const action = window.TODO_PLUGIN ? {} : {
+    "data-pop-anchor": true,
+    title: "改重复",
+    onClick: (e) => openPop("repeat", i.id, e.currentTarget),
+  };
+  const label = html`<span class="rep" ...${action}>↻ ${st.label}</span>`;
   if (!OPEN.includes(i.status)) return label;
   return html`${label}${st.streak > 1 ? html`<span class="rep-note">连续 ${st.streak} ${st.unit}</span>` : null}`;
 }

@@ -31,11 +31,14 @@ export function Pill({ item }) {
 // The due date in an item's meta line: a click opens the date picker
 function Due({ item: i }) {
   const { openPop } = useBoard();
-  const open = (e) => openPop("picker", i.id, e.currentTarget);
+  const action = window.TODO_PLUGIN ? {} : {
+    "data-pop-anchor": true,
+    onClick: (e) => openPop("picker", i.id, e.currentTarget),
+  };
   const d = dueInfo(i.due);
-  if (!d) return html`<span class="due" data-pop-anchor onClick=${open}>${i.due === "待确认" ? "截止待定" : `截止 ${i.due}`}</span>`;
+  if (!d) return html`<span class="due" ...${action}>${i.due === "待确认" ? "截止待定" : `截止 ${i.due}`}</span>`;
   const rel = !OPEN.includes(i.status) ? null : d.soon ? html`<span class="soon">${d.rel}</span>` : `　${d.rel}`;
-  return html`<span class="due" data-pop-anchor title=${d.local || null} onClick=${open}>截止 ${d.date}${rel}</span>`;
+  return html`<span class="due" title=${d.local || null} ...${action}>截止 ${d.date}${rel}</span>`;
 }
 
 // The small meta line
@@ -62,6 +65,7 @@ function metaOf(i) {
 // staggering; see useFold.js)
 export function ItemRow({ item: i, exiting = false, enter = null, leave = null }) {
   const { ui, setUi, act, setPop, openPop } = useBoard();
+  const editable = !window.TODO_PLUGIN;
   const ref = useRef(null);
   const loc = ui.locate?.id === i.id ? ui.locate.n : 0;
   useEffect(() => {
@@ -71,7 +75,7 @@ export function ItemRow({ item: i, exiting = false, enter = null, leave = null }
     exiting ? { delay: STRIKE_MS, duration: MOVE_MS - 100, easing: "cubic-bezier(.4, 0, .2, 1)" } : { delay: staggerOf(enter ?? leave) });
   // The editor row carries data-id too: the card tracks order by data-id, so opening the editor is not an order change and
   // the rows below do not slide
-  if (ui.editing === `i:${i.id}`) return html`<div class="item" data-id=${i.id}><div class="body"><${ItemForm} item=${i} /></div></div>`;
+  if (editable && ui.editing === `i:${i.id}`) return html`<div class="item" data-id=${i.id}><div class="body"><${ItemForm} item=${i} /></div></div>`;
   const meta = metaOf(i);
   // Only the ✎ on the right opens the editor (opening it by clicking the title was too easy to do by accident); clicking
   // the title does nothing, so it can be selected and copied, and links in it work as usual
@@ -93,19 +97,19 @@ export function ItemRow({ item: i, exiting = false, enter = null, leave = null }
       ${i.agent?.result ? html`<div class="n"><${Md} text=${`Agent 结果：${i.agent.result}`} /></div>` : null}
       ${meta.length ? html`<div class="m">${meta}</div>` : null}
     </div>
-    <div class="tools">
+    ${isOpen || editable ? html`<div class="tools">
       ${isOpen ? html`<button class="tool" title="上移" onClick=${() => act.item(i.id).move("up")}>↑</button>
       <button class="tool" title="下移" onClick=${() => act.item(i.id).move("down")}>↓</button>` : null}
-      ${i.repeat?.days?.length ? html`<button class="tool" title="菜单" data-pop-anchor onClick=${(e) => openPop("status", i.id, e.currentTarget)}>⋯</button>` : null}
-      <button class="tool" title="编辑" onClick=${edit}>✎</button>
-    </div>
+      ${editable && i.repeat?.days?.length ? html`<button class="tool" title="菜单" data-pop-anchor onClick=${(e) => openPop("status", i.id, e.currentTarget)}>⋯</button>` : null}
+      ${editable ? html`<button class="tool" title="编辑" onClick=${edit}>✎</button>` : null}
+    </div>` : null}
   </div>`;
 }
 
 // Editor: title, note, due date, repeat, (depending on status) where the agent runs / who it is waiting on / why it was
 // dropped, and which card it is in. Saved only on Save (except repeat, which is saved as soon as it changes)
 export function ItemForm({ item: i }) {
-  const { doc, act, setPop, openPop } = useBoard();
+  const { doc, act, openPop } = useBoard();
   const initial = useRef({ title: i.title, note: i.note ?? "", due: i.due ?? "", group: i.group,
     where: i.agent?.where ?? "", anote: i.agent?.note ?? "", waitingOn: i.waitingOn ?? "", reason: i.reason ?? "" }).current;
   const { f, set, bind } = useForm(initial);

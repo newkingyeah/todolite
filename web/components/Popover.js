@@ -59,8 +59,9 @@ function morph(el, a, b, sheet) {
     .finished.then(() => el.classList.remove("morphing"), () => el.classList.remove("morphing"));
 }
 
-// Status menu: the six statuses (recurring items have no done; "done today" is at the top instead), then due date, repeat
-// and edit
+const PLUGIN_STATUSES = ["todo", "done", "dropped", "waiting"];
+
+// The web board also offers Agent handoff, progress, due date, repeat and inline editing.
 function StatusMenu({ item }) {
   const { doc, act, pop, setPop, setUi } = useBoard();
   const it = act.item(item.id);
@@ -81,6 +82,15 @@ function StatusMenu({ item }) {
     cheer(doc.theme, document.querySelector(`.pill[data-id="${CSS.escape(item.id)}"]`));
     return save();
   };
+  if (window.TODO_PLUGIN) {
+    return PLUGIN_STATUSES.map((s) => {
+      const checkIn = rep && s === "done";
+      return html`<${Opt} key=${s} s=${s} icon=${html`<${StatusIcon} s=${s} />`} label=${LABEL[s]}
+        cur=${checkIn ? st.done : item.status === s}
+        disabled=${checkIn && (!OPEN.includes(item.status) || !st.scheduled || st.done)}
+        onClick=${checkIn ? tick : () => pick(s)} />`;
+    });
+  }
   const edit = () => { setPop(null); setUi({ editing: pop.from === "agent" ? `i:${item.id}@agent` : `i:${item.id}`, adding: null }); };
   return html`${rep && st.scheduled && OPEN.includes(item.status) ? html`<${Opt} icon=${html`<${StatusIcon} s="done" />`} label=${st.done ? "取消今天的打卡" : "今天做完了"} onClick=${tick} /><div class="sep"></div>` : null}
     ${ORDER.filter((s) => !(rep && s === "done")).map((s) => html`<${Opt} key=${s} s=${s} icon=${html`<${StatusIcon} s=${s} />`} label=${LABEL[s]} cur=${item.status === s} onClick=${() => pick(s)} />`)}
@@ -89,7 +99,7 @@ function StatusMenu({ item }) {
     <${Opt} icon=${html`<${RepeatIcon} />`} label=${rep ? "改重复" : "设为重复"} onClick=${() => setPop({ ...pop, kind: "repeat" })} />
     <${Opt} icon=${html`<${EditIcon} />`} label="编辑" onClick=${edit} />`;
 }
-const Opt = ({ icon, label, cur, onClick, s = "" }) => html`<button class=${`opt ${s ? `s-${s}` : ""}`} onClick=${onClick}><span class="i">${icon}</span>${label}${cur ? html`<span class="cur">当前</span>` : null}</button>`;
+const Opt = ({ icon, label, cur, onClick, s = "", disabled = false }) => html`<button class=${`opt ${s ? `s-${s}` : ""}`} disabled=${disabled} onClick=${onClick}><span class="i">${icon}</span>${label}${cur ? html`<span class="cur">当前</span>` : null}</button>`;
 
 // Agent, waiting, dropped: ask one follow-up question, then change the status
 const QUESTIONS = { agent: "挂在哪？", waiting: "在等谁、等什么？", dropped: "为什么不做了？" };
