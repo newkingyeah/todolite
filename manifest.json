@@ -1,7 +1,7 @@
 {
   "id": "todo-lite",
-  "name": "AI Based ToDo Lite",
-  "version": "1.2.0",
+  "name": "aibased-todolite",
+  "version": "1.2.1",
   "minAppVersion": "1.15.1",
   "description": "Manage a local task board, calendar, and habit check-ins with optional MCP integration.",
   "author": "newkingyeah",
